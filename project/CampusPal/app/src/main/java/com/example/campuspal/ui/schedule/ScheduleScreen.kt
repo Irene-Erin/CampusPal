@@ -67,7 +67,7 @@ fun ScheduleScreen(viewModel: ScheduleViewModel) {
         }
     }
 
-    // 悬浮按钮 — 现代化设计
+    // 悬浮按钮 — 大圆角设计
     FloatingActionButton(
         onClick = { viewModel.showAddDialog() },
         modifier = Modifier
@@ -77,11 +77,15 @@ fun ScheduleScreen(viewModel: ScheduleViewModel) {
         containerColor = MaterialTheme.colorScheme.primary,
         shape = RoundedCornerShape(18.dp),
         elevation = FloatingActionButtonDefaults.elevation(
-            defaultElevation = 4.dp,
-            pressedElevation = 8.dp,
+            defaultElevation = 6.dp,
+            pressedElevation = 10.dp,
         ),
     ) {
-        Icon(Icons.Filled.Add, contentDescription = "添加课程", modifier = Modifier.size(28.dp))
+        Icon(
+            Icons.Filled.Add,
+            contentDescription = "添加课程",
+            modifier = Modifier.size(28.dp),
+        )
     }
 
     // 课程详情对话框

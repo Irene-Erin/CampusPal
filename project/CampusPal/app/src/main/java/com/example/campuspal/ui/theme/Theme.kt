@@ -3,20 +3,35 @@ package com.example.campuspal.ui.theme
 import android.app.Activity
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
 
-// 主题模式
 enum class ThemeMode(val label: String) {
     SYSTEM("跟随系统"),
     LIGHT("浅色"),
     DARK("深色"),
 }
+
+// 全局圆角系统
+val LargeRounding = 24.dp
+val MediumRounding = 16.dp
+val SmallRounding = 10.dp
+val TinyRounding = 6.dp
+
+val CampusPalShapes = Shapes(
+    extraLarge = RoundedCornerShape(LargeRounding),
+    large = RoundedCornerShape(MediumRounding),
+    medium = RoundedCornerShape(SmallRounding),
+    small = RoundedCornerShape(TinyRounding),
+    extraSmall = RoundedCornerShape(4.dp),
+)
 
 fun sunsetColorScheme() = lightColorScheme(
     primary = SunsetPrimary, onPrimary = SunsetOnPrimary,
@@ -70,6 +85,32 @@ fun forestColorScheme() = lightColorScheme(
     error = ErrorRed,
 )
 
+fun lavenderColorScheme() = lightColorScheme(
+    primary = LavenderPrimary, onPrimary = LavenderOnPrimary,
+    primaryContainer = LavenderPrimaryContainer, onPrimaryContainer = LavenderOnPrimaryContainer,
+    secondary = LavenderSecondary, onSecondary = LavenderOnSecondary,
+    secondaryContainer = LavenderSecondaryContainer,
+    tertiary = LavenderTertiary, onTertiary = LavenderOnTertiary,
+    background = LavenderBackground, surface = LavenderSurface,
+    surfaceVariant = LavenderSurfaceVariant,
+    onBackground = LavenderOnBackground, onSurface = LavenderOnSurface,
+    onSurfaceVariant = LavenderOnSurfaceVariant, outline = LavenderOutline,
+    error = ErrorRed,
+)
+
+fun matchaColorScheme() = lightColorScheme(
+    primary = MatchaPrimary, onPrimary = MatchaOnPrimary,
+    primaryContainer = MatchaPrimaryContainer, onPrimaryContainer = MatchaOnPrimaryContainer,
+    secondary = MatchaSecondary, onSecondary = MatchaOnSecondary,
+    secondaryContainer = MatchaSecondaryContainer,
+    tertiary = MatchaTertiary, onTertiary = MatchaOnTertiary,
+    background = MatchaBackground, surface = MatchaSurface,
+    surfaceVariant = MatchaSurfaceVariant,
+    onBackground = MatchaOnBackground, onSurface = MatchaOnSurface,
+    onSurfaceVariant = MatchaOnSurfaceVariant, outline = MatchaOutline,
+    error = ErrorRed,
+)
+
 fun midnightColorScheme() = darkColorScheme(
     primary = MidnightPrimary, onPrimary = MidnightOnPrimary,
     primaryContainer = MidnightPrimaryContainer, onPrimaryContainer = MidnightOnPrimaryContainer,
@@ -98,18 +139,22 @@ fun CampusPalTheme(
         ThemeMode.DARK -> true
     }
 
-    // 尝试 dynamicColor（Android 12+），否则回退到自定义配色
     val colorScheme = when {
-        // Android 12+ 且使用预设主题时尝试 dynamicColor
-        Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
-        colorSchemeType == ColorSchemeType.SUNSET && themeMode != ThemeMode.DARK -> {
-            if (isDarkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-        }
         isDarkTheme -> midnightColorScheme()
-        colorSchemeType == ColorSchemeType.OCEAN -> oceanColorScheme()
-        colorSchemeType == ColorSchemeType.CHERRY -> cherryColorScheme()
-        colorSchemeType == ColorSchemeType.FOREST -> forestColorScheme()
-        else -> sunsetColorScheme()
+        Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
+            when {
+                isDarkTheme -> dynamicDarkColorScheme(context)
+                else -> dynamicLightColorScheme(context)
+            }
+        }
+        else -> when (colorSchemeType) {
+            ColorSchemeType.OCEAN -> oceanColorScheme()
+            ColorSchemeType.CHERRY -> cherryColorScheme()
+            ColorSchemeType.FOREST -> forestColorScheme()
+            ColorSchemeType.LAVENDER -> lavenderColorScheme()
+            ColorSchemeType.MATCHA -> matchaColorScheme()
+            else -> sunsetColorScheme()
+        }
     }
 
     val view = LocalView.current
@@ -123,6 +168,7 @@ fun CampusPalTheme(
 
     MaterialTheme(
         colorScheme = colorScheme,
+        shapes = CampusPalShapes,
         typography = Typography,
         content = content,
     )

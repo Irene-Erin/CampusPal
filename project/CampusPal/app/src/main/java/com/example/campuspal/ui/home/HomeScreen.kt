@@ -1,5 +1,6 @@
 package com.example.campuspal.ui.home
 
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -40,9 +41,8 @@ fun HomeScreen(viewModel: HomeViewModel, navController: NavController) {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(20.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            // 头部问候
             item {
                 GreetingHeader(
                     greeting = uiState.greeting,
@@ -53,7 +53,6 @@ fun HomeScreen(viewModel: HomeViewModel, navController: NavController) {
                 )
             }
 
-            // 今日课程卡片
             item {
                 TodayCourseCard(
                     courses = uiState.todayCourses,
@@ -62,7 +61,6 @@ fun HomeScreen(viewModel: HomeViewModel, navController: NavController) {
                 )
             }
 
-            // 待办提醒卡片
             item {
                 UrgentTasksCard(
                     tasks = uiState.urgentTasks,
@@ -70,7 +68,6 @@ fun HomeScreen(viewModel: HomeViewModel, navController: NavController) {
                 )
             }
 
-            // 今日收支卡片
             item {
                 TodayExpenseCard(
                     todayExpense = uiState.todayTotalExpense,
@@ -93,79 +90,110 @@ fun GreetingHeader(
     onSettingsClick: () -> Unit,
     onGradeClick: () -> Unit,
 ) {
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.Top,
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = date,
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    letterSpacing = 1.sp,
-                )
-                Spacer(modifier = Modifier.height(6.dp))
-                Text(
-                    text = greeting,
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onBackground,
-                )
-            }
-            Row {
-                IconButton(
-                    onClick = onGradeClick,
-                    modifier = Modifier.size(40.dp),
+    val gradientColors = listOf(
+        MaterialTheme.colorScheme.primary,
+        MaterialTheme.colorScheme.tertiary,
+    )
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(24.dp),
+        color = MaterialTheme.colorScheme.primary,
+    ) {
+        Box(modifier = Modifier.fillMaxWidth()) {
+            // 渐变背景
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(160.dp)
+                    .background(
+                        Brush.horizontalGradient(gradientColors)
+                    ),
+            )
+            Column(modifier = Modifier.padding(20.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.Top,
                 ) {
-                    Icon(
-                        Icons.Filled.School,
-                        contentDescription = "成绩",
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(22.dp),
-                    )
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = date,
+                            style = MaterialTheme.typography.labelLarge,
+                            color = Color.White.copy(alpha = 0.8f),
+                            letterSpacing = 1.sp,
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = greeting,
+                            style = MaterialTheme.typography.headlineMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White,
+                        )
+                    }
+                    Row {
+                        IconButton(
+                            onClick = onGradeClick,
+                            modifier = Modifier.size(40.dp),
+                        ) {
+                            Icon(
+                                Icons.Filled.School,
+                                contentDescription = "成绩",
+                                tint = Color.White.copy(alpha = 0.9f),
+                                modifier = Modifier.size(22.dp),
+                            )
+                        }
+                        IconButton(
+                            onClick = onSettingsClick,
+                            modifier = Modifier.size(40.dp),
+                        ) {
+                            Icon(
+                                Icons.Filled.Settings,
+                                contentDescription = "设置",
+                                tint = Color.White.copy(alpha = 0.7f),
+                                modifier = Modifier.size(22.dp),
+                            )
+                        }
+                    }
                 }
-                IconButton(
-                    onClick = onSettingsClick,
-                    modifier = Modifier.size(40.dp),
-                ) {
-                    Icon(
-                        Icons.Filled.Settings,
-                        contentDescription = "设置",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(22.dp),
-                    )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Surface(
+                        shape = RoundedCornerShape(20.dp),
+                        color = Color.White.copy(alpha = 0.25f),
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Icon(
+                                Icons.Filled.CalendarToday,
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.size(14.dp),
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "第 $currentWeek 周",
+                                style = MaterialTheme.typography.labelLarge,
+                                color = Color.White,
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                        }
+                    }
+                    Surface(
+                        shape = RoundedCornerShape(20.dp),
+                        color = Color.White.copy(alpha = 0.15f),
+                    ) {
+                        Text(
+                            text = "新学期",
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
+                            style = MaterialTheme.typography.labelLarge,
+                            color = Color.White.copy(alpha = 0.8f),
+                        )
+                    }
                 }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(10.dp))
-
-        // 周次标签 — 更圆润的设计
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Surface(
-                shape = RoundedCornerShape(20.dp),
-                color = MaterialTheme.colorScheme.primaryContainer,
-            ) {
-                Text(
-                    text = "第 $currentWeek 周",
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer,
-                    fontWeight = FontWeight.SemiBold,
-                )
-            }
-            Surface(
-                shape = RoundedCornerShape(20.dp),
-                color = MaterialTheme.colorScheme.secondaryContainer,
-            ) {
-                Text(
-                    text = "新学期",
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSecondaryContainer,
-                )
             }
         }
     }
@@ -181,31 +209,34 @@ fun TodayCourseCard(
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onClick() },
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 3.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
     ) {
-        Column(modifier = Modifier.padding(20.dp)) {
-            // 标题栏
+        Column(
+            modifier = Modifier
+                .animateContentSize()
+                .padding(20.dp),
+        ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        modifier = Modifier
-                            .size(36.dp)
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(MaterialTheme.colorScheme.primaryContainer),
-                        contentAlignment = Alignment.Center,
+                    Surface(
+                        modifier = Modifier.size(40.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.primaryContainer,
                     ) {
-                        Icon(
-                            Icons.Filled.School,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(20.dp),
-                        )
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                Icons.Filled.School,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(22.dp),
+                            )
+                        }
                     }
                     Spacer(modifier = Modifier.width(12.dp))
                     Column {
@@ -221,49 +252,41 @@ fun TodayCourseCard(
                         )
                     }
                 }
-                Surface(
-                    shape = RoundedCornerShape(8.dp),
-                    color = MaterialTheme.colorScheme.surfaceVariant,
-                    modifier = Modifier.clickable { onClick() },
+                TextButton(
+                    onClick = onClick,
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
                 ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text("查看全部", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Icon(
-                            Icons.Filled.ChevronRight,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(16.dp),
-                        )
-                    }
+                    Text("查看全部", fontSize = 12.sp)
+                    Icon(
+                        Icons.Filled.ChevronRight,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                    )
                 }
             }
 
             Spacer(modifier = Modifier.height(16.dp))
 
             if (courses.isEmpty()) {
-                // 空状态 — 更友好的设计
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(vertical = 20.dp),
+                        .padding(vertical = 24.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(56.dp)
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.secondaryContainer),
-                        contentAlignment = Alignment.Center,
+                    Surface(
+                        modifier = Modifier.size(56.dp),
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.secondaryContainer,
                     ) {
-                        Icon(
-                            Icons.Filled.SelfImprovement,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.secondary,
-                            modifier = Modifier.size(28.dp),
-                        )
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                Icons.Filled.SelfImprovement,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.secondary,
+                                modifier = Modifier.size(28.dp),
+                            )
+                        }
                     }
                     Spacer(modifier = Modifier.height(12.dp))
                     Text(
@@ -273,7 +296,6 @@ fun TodayCourseCard(
                     )
                 }
             } else {
-                // 下一节课倒计时条
                 if (nextCourseMinutes != null) {
                     val isInClass = nextCourseMinutes == 0
                     Surface(
@@ -285,25 +307,23 @@ fun TodayCourseCard(
                         modifier = Modifier.fillMaxWidth(),
                     ) {
                         Row(
-                            modifier = Modifier.padding(14.dp),
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(32.dp)
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(
-                                        if (isInClass) SuccessGreen.copy(alpha = 0.2f)
-                                        else MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
-                                    ),
-                                contentAlignment = Alignment.Center,
+                            Surface(
+                                modifier = Modifier.size(36.dp),
+                                shape = RoundedCornerShape(10.dp),
+                                color = if (isInClass) SuccessGreen.copy(alpha = 0.2f)
+                                else MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
                             ) {
-                                Icon(
-                                    Icons.Filled.Timer,
-                                    contentDescription = null,
-                                    tint = if (isInClass) SuccessGreen else MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(18.dp),
-                                )
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        Icons.Filled.Timer,
+                                        contentDescription = null,
+                                        tint = if (isInClass) SuccessGreen else MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(20.dp),
+                                    )
+                                }
                             }
                             Spacer(modifier = Modifier.width(12.dp))
                             Text(
@@ -319,7 +339,6 @@ fun TodayCourseCard(
                     Spacer(modifier = Modifier.height(12.dp))
                 }
 
-                // 课程列表 — 带颜色条的卡片式设计
                 courses.take(4).forEach { course ->
                     Row(
                         modifier = Modifier
@@ -327,13 +346,13 @@ fun TodayCourseCard(
                             .padding(vertical = 6.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Box(
+                        Surface(
                             modifier = Modifier
                                 .width(4.dp)
-                                .height(38.dp)
-                                .clip(RoundedCornerShape(2.dp))
-                                .background(Color(course.color)),
-                        )
+                                .height(42.dp),
+                            shape = RoundedCornerShape(2.dp),
+                            color = Color(course.color),
+                        ) {}
                         Spacer(modifier = Modifier.width(14.dp))
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
@@ -383,30 +402,34 @@ fun UrgentTasksCard(
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onClick() },
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 3.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
     ) {
-        Column(modifier = Modifier.padding(20.dp)) {
+        Column(
+            modifier = Modifier
+                .animateContentSize()
+                .padding(20.dp),
+        ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        modifier = Modifier
-                            .size(36.dp)
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(MaterialTheme.colorScheme.tertiary.copy(alpha = 0.15f)),
-                        contentAlignment = Alignment.Center,
+                    Surface(
+                        modifier = Modifier.size(40.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.15f),
                     ) {
-                        Icon(
-                            Icons.Filled.Assignment,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.tertiary,
-                            modifier = Modifier.size(20.dp),
-                        )
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                Icons.Filled.Assignment,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.tertiary,
+                                modifier = Modifier.size(22.dp),
+                            )
+                        }
                     }
                     Spacer(modifier = Modifier.width(12.dp))
                     Column {
@@ -422,23 +445,12 @@ fun UrgentTasksCard(
                         )
                     }
                 }
-                Surface(
-                    shape = RoundedCornerShape(8.dp),
-                    color = MaterialTheme.colorScheme.surfaceVariant,
-                    modifier = Modifier.clickable { onClick() },
+                TextButton(
+                    onClick = onClick,
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
                 ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text("查看全部", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Icon(
-                            Icons.Filled.ChevronRight,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(16.dp),
-                        )
-                    }
+                    Text("查看全部", fontSize = 12.sp)
+                    Icon(Icons.Filled.ChevronRight, null, modifier = Modifier.size(16.dp))
                 }
             }
 
@@ -451,19 +463,19 @@ fun UrgentTasksCard(
                         .padding(vertical = 16.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(48.dp)
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.primaryContainer),
-                        contentAlignment = Alignment.Center,
+                    Surface(
+                        modifier = Modifier.size(48.dp),
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.primaryContainer,
                     ) {
-                        Icon(
-                            Icons.Filled.Celebration,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(24.dp),
-                        )
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                Icons.Filled.Celebration,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(24.dp),
+                            )
+                        }
                     }
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
@@ -475,42 +487,46 @@ fun UrgentTasksCard(
             } else {
                 tasks.take(3).forEach { task ->
                     val isOverdue = task.deadline != null && task.deadline.before(java.util.Date())
-
-                    Row(
+                    Surface(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically,
+                            .padding(vertical = 5.dp),
+                        shape = RoundedCornerShape(10.dp),
+                        color = if (isOverdue) ErrorRed.copy(alpha = 0.05f)
+                        else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .size(10.dp)
-                                .clip(CircleShape)
-                                .background(
-                                    if (isOverdue) ErrorRed
-                                    else PriorityColors[task.priority.coerceIn(0, 3)]
-                                ),
-                        )
-                        Spacer(modifier = Modifier.width(14.dp))
-                        Text(
-                            text = task.title,
-                            style = MaterialTheme.typography.bodyLarge,
-                            modifier = Modifier.weight(1f),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                        if (isOverdue) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
                             Surface(
-                                shape = RoundedCornerShape(6.dp),
-                                color = ErrorRed.copy(alpha = 0.1f),
-                            ) {
-                                Text(
-                                    text = "逾期",
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
-                                    fontSize = 11.sp,
-                                    color = ErrorRed,
-                                    fontWeight = FontWeight.SemiBold,
-                                )
+                                modifier = Modifier.size(10.dp),
+                                shape = CircleShape,
+                                color = if (isOverdue) ErrorRed
+                                else PriorityColors[task.priority.coerceIn(0, 3)],
+                            ) {}
+                            Spacer(modifier = Modifier.width(14.dp))
+                            Text(
+                                text = task.title,
+                                style = MaterialTheme.typography.bodyLarge,
+                                modifier = Modifier.weight(1f),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                            if (isOverdue) {
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Surface(
+                                    shape = RoundedCornerShape(6.dp),
+                                    color = ErrorRed.copy(alpha = 0.1f),
+                                ) {
+                                    Text(
+                                        text = "逾期",
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                                        fontSize = 11.sp,
+                                        color = ErrorRed,
+                                        fontWeight = FontWeight.SemiBold,
+                                    )
+                                }
                             }
                         }
                     }
@@ -539,31 +555,34 @@ fun TodayExpenseCard(
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onClick() },
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 3.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
     ) {
-        Column(modifier = Modifier.padding(20.dp)) {
-            // 标题栏
+        Column(
+            modifier = Modifier
+                .animateContentSize()
+                .padding(20.dp),
+        ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        modifier = Modifier
-                            .size(36.dp)
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(ErrorRed.copy(alpha = 0.1f)),
-                        contentAlignment = Alignment.Center,
+                    Surface(
+                        modifier = Modifier.size(40.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        color = ErrorRed.copy(alpha = 0.1f),
                     ) {
-                        Icon(
-                            Icons.Filled.AccountBalanceWallet,
-                            contentDescription = null,
-                            tint = ExpenseRed,
-                            modifier = Modifier.size(20.dp),
-                        )
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                Icons.Filled.AccountBalanceWallet,
+                                contentDescription = null,
+                                tint = ExpenseRed,
+                                modifier = Modifier.size(22.dp),
+                            )
+                        }
                     }
                     Spacer(modifier = Modifier.width(12.dp))
                     Text(
@@ -572,36 +591,28 @@ fun TodayExpenseCard(
                         fontWeight = FontWeight.Bold,
                     )
                 }
-                Surface(
-                    shape = RoundedCornerShape(8.dp),
-                    color = MaterialTheme.colorScheme.surfaceVariant,
-                    modifier = Modifier.clickable { onClick() },
+                TextButton(
+                    onClick = onClick,
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
                 ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text("查看全部", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Icon(
-                            Icons.Filled.ChevronRight,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(16.dp),
-                        )
-                    }
+                    Text("查看全部", fontSize = 12.sp)
+                    Icon(Icons.Filled.ChevronRight, null, modifier = Modifier.size(16.dp))
                 }
             }
 
             Spacer(modifier = Modifier.height(20.dp))
 
-            // 数据行
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.Bottom,
             ) {
                 Column {
-                    Text("今日支出", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(
+                        "今日支出",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         "¥ %.2f".format(todayExpense),
@@ -611,7 +622,11 @@ fun TodayExpenseCard(
                     )
                 }
                 Column(horizontalAlignment = Alignment.End) {
-                    Text("月度预算剩余", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(
+                        "月度预算剩余",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         "¥ %.0f".format(remaining),
@@ -624,7 +639,6 @@ fun TodayExpenseCard(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // 进度条
             Column {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -641,13 +655,13 @@ fun TodayExpenseCard(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                Spacer(modifier = Modifier.height(6.dp))
+                Spacer(modifier = Modifier.height(8.dp))
                 LinearProgressIndicator(
                     progress = budgetPercent,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(8.dp)
-                        .clip(RoundedCornerShape(4.dp)),
+                        .height(10.dp)
+                        .clip(RoundedCornerShape(5.dp)),
                     color = budgetColor,
                     trackColor = MaterialTheme.colorScheme.surfaceVariant,
                 )

@@ -89,6 +89,8 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                             ColorSchemeType.OCEAN -> listOf(0xFF3B6BA5, 0xFF5E9B8C, 0xFFC5896E)
                             ColorSchemeType.CHERRY -> listOf(0xFFD4687C, 0xFFC49BA0, 0xFFD4956A)
                             ColorSchemeType.FOREST -> listOf(0xFF4A8C6F, 0xFF8BAA7C, 0xFFC49B5E)
+                            ColorSchemeType.LAVENDER -> listOf(0xFF7B6CB5, 0xFFC49BA0, 0xFF8BA8C4)
+                            ColorSchemeType.MATCHA -> listOf(0xFF7AAA5E, 0xFFD4A854, 0xFF60A0B8)
                         }
                         Card(
                             modifier = Modifier
