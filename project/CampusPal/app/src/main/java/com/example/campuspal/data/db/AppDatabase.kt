@@ -1,0 +1,52 @@
+package com.example.campuspal.data.db
+
+import android.content.Context
+import androidx.room.Database
+import androidx.room.Room
+import androidx.room.RoomDatabase
+import androidx.room.TypeConverters
+import com.example.campuspal.data.db.converter.Converters
+import com.example.campuspal.data.db.dao.*
+import com.example.campuspal.data.db.entity.*
+
+@Database(
+    entities = [
+        Course::class,
+        Task::class,
+        Expense::class,
+        Exam::class,
+        StudySession::class,
+        Grade::class,
+    ],
+    version = 1,
+    exportSchema = false,
+)
+@TypeConverters(Converters::class)
+abstract class AppDatabase : RoomDatabase() {
+
+    abstract fun courseDao(): CourseDao
+    abstract fun taskDao(): TaskDao
+    abstract fun expenseDao(): ExpenseDao
+    abstract fun examDao(): ExamDao
+    abstract fun studySessionDao(): StudySessionDao
+    abstract fun gradeDao(): GradeDao
+
+    companion object {
+        @Volatile
+        private var INSTANCE: AppDatabase? = null
+
+        fun getInstance(context: Context): AppDatabase {
+            return INSTANCE ?: synchronized(this) {
+                val instance = Room.databaseBuilder(
+                    context.applicationContext,
+                    AppDatabase::class.java,
+                    "campuspal_database"
+                )
+                    .fallbackToDestructiveMigration()
+                    .build()
+                INSTANCE = instance
+                instance
+            }
+        }
+    }
+}

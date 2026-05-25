@@ -1,0 +1,19 @@
+# IDE
+.idea/
+*.iml
+
+# Gradle
+.gradle/
+build/
+*/build/
+
+# Local properties
+local.properties
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Sensitive
+*.keystore
+*.jks
