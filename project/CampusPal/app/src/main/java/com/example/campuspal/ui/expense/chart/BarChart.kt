@@ -48,7 +48,7 @@ fun BarChartCard(
                 val barH = 140.dp
                 val barW = 28.dp
                 val gap = 12.dp
-                val chartW = bars.size * (barW + gap)
+                val chartW = (barW + gap) * bars.size
                 val themePrimary = MaterialTheme.colorScheme.primary
                 val textColor = MaterialTheme.colorScheme.onSurfaceVariant
 

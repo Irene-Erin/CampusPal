@@ -51,7 +51,7 @@ fun LineChartCard(
                 val themePrimary = MaterialTheme.colorScheme.primary
                 val textColor = MaterialTheme.colorScheme.onSurfaceVariant
                 val pointGap = 48.dp
-                val chartW = points.size * pointGap
+                val chartW = pointGap * points.size
                 val chartH = 140.dp
 
                 Canvas(
