@@ -31,6 +31,7 @@ import com.example.campuspal.ui.settings.SettingsScreen
 import com.example.campuspal.ui.settings.SettingsViewModel
 import com.example.campuspal.ui.theme.CampusPalTheme
 import com.example.campuspal.ui.theme.ColorSchemeType
+import com.example.campuspal.ui.theme.ThemeMode
 import com.example.campuspal.ui.todo.TodoScreen
 import com.example.campuspal.ui.todo.TodoViewModel
 import kotlinx.coroutines.flow.first
@@ -45,10 +46,12 @@ class MainActivity : ComponentActivity() {
         setContent {
             val isDarkTheme by app.settingsDataStore.isDarkTheme.collectAsState(initial = false)
             val colorSchemeName by app.settingsDataStore.colorScheme.collectAsState(initial = "SUNSET")
+            val themeModeName by app.settingsDataStore.themeMode.collectAsState(initial = "SYSTEM")
             val colorSchemeType = try { ColorSchemeType.valueOf(colorSchemeName) } catch (_: Exception) { ColorSchemeType.SUNSET }
+            val themeMode = try { ThemeMode.valueOf(themeModeName) } catch (_: Exception) { ThemeMode.SYSTEM }
 
             CampusPalTheme(
-                isDarkTheme = isDarkTheme,
+                themeMode = themeMode,
                 colorSchemeType = colorSchemeType,
             ) {
                 MainScreen(app)

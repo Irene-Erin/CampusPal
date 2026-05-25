@@ -27,7 +27,9 @@ import androidx.compose.ui.unit.sp
 import com.example.campuspal.data.db.dao.StudyStat
 import com.example.campuspal.data.db.entity.Course
 import com.example.campuspal.data.db.entity.Exam
+import com.example.campuspal.ui.components.CountdownTimer
 import com.example.campuspal.ui.theme.*
+import com.example.campuspal.worker.ExamReminderWorker
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -86,11 +88,15 @@ fun LearnScreen(viewModel: LearnViewModel) {
     }
 
     // 添加考试对话框
+    val context = androidx.compose.ui.platform.LocalContext.current
     if (showAddExamDialog) {
         AddExamDialog(
             courses = uiState.courses,
             onDismiss = { viewModel.hideAddExam() },
-            onSave = { viewModel.addExam(it) },
+            onSave = {
+                viewModel.addExam(it)
+                ExamReminderWorker.schedule(context, it.id, it.examDate)
+            },
         )
     }
 }
@@ -389,34 +395,12 @@ fun ExamCountdownSection(
                             )
                         }
 
-                        // 剩余天数
-                        Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            color = when {
-                                daysLeft < 0 -> ErrorRed.copy(alpha = 0.1f)
-                                daysLeft <= 3 -> ErrorRed.copy(alpha = 0.1f)
-                                daysLeft <= 7 -> Tertiary.copy(alpha = 0.1f)
-                                else -> SuccessGreen.copy(alpha = 0.1f)
-                            },
-                        ) {
-                            Text(
-                                text = when {
-                                    daysLeft < 0 -> "已结束"
-                                    daysLeft == 0 -> "今天"
-                                    daysLeft == 1 -> "明天"
-                                    else -> "${daysLeft}天"
-                                },
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = when {
-                                    daysLeft < 0 -> ErrorRed
-                                    daysLeft <= 3 -> ErrorRed
-                                    daysLeft <= 7 -> Tertiary
-                                    else -> SuccessGreen
-                                },
-                            )
-                        }
+                        // 实时倒计时
+                        CountdownTimer(
+                            targetMillis = exam.examDate,
+                            compact = true,
+                            showLabels = false,
+                        )
 
                         // 删除
                         IconButton(
@@ -543,6 +527,15 @@ fun AddExamDialog(
     var selectedCourseId by remember { mutableStateOf<Long?>(null) }
     var showDatePicker by remember { mutableStateOf(false) }
     var selectedDate by remember { mutableStateOf(Date()) }
+    var hour by remember { mutableStateOf(Calendar.getInstance().get(Calendar.HOUR_OF_DAY)) }
+    var minute by remember { mutableStateOf(Calendar.getInstance().get(Calendar.MINUTE)) }
+
+    fun updateDateTime(dateMillis: Long) {
+        val cal = Calendar.getInstance().apply { timeInMillis = dateMillis }
+        cal.set(Calendar.HOUR_OF_DAY, hour)
+        cal.set(Calendar.MINUTE, minute)
+        selectedDate = cal.time
+    }
 
     val datePickerState = rememberDatePickerState(initialSelectedDateMillis = System.currentTimeMillis())
 
@@ -551,39 +544,30 @@ fun AddExamDialog(
         title = { Text("添加考试") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(
-                    value = name,
-                    onValueChange = { name = it },
-                    label = { Text("考试名称 *") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                )
+                OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("考试名称 *") }, singleLine = true, modifier = Modifier.fillMaxWidth())
 
                 if (courses.isNotEmpty()) {
                     Text("关联课程", style = MaterialTheme.typography.labelLarge)
-                    Row(
-                        modifier = Modifier.horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    ) {
-                        FilterChip(
-                            selected = selectedCourseId == null,
-                            onClick = { selectedCourseId = null },
-                            label = { Text("无", fontSize = 12.sp) },
-                        )
+                    Row(modifier = Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        FilterChip(selected = selectedCourseId == null, onClick = { selectedCourseId = null }, label = { Text("无", fontSize = 12.sp) })
                         courses.take(6).forEach { course ->
-                            FilterChip(
-                                selected = selectedCourseId == course.id,
-                                onClick = { selectedCourseId = course.id },
-                                label = { Text(course.name, fontSize = 12.sp) },
-                            )
+                            FilterChip(selected = selectedCourseId == course.id, onClick = { selectedCourseId = course.id }, label = { Text(course.name, fontSize = 12.sp) })
                         }
                     }
                 }
 
+                // 日期
                 TextButton(onClick = { showDatePicker = true }) {
-                    Icon(Icons.Filled.CalendarToday, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(SimpleDateFormat("yyyy/MM/dd HH:mm", Locale.getDefault()).format(selectedDate))
+                    Icon(Icons.Filled.CalendarToday, null, modifier = Modifier.size(18.dp)); Spacer(Modifier.width(8.dp))
+                    Text(SimpleDateFormat("yyyy/MM/dd", Locale.getDefault()).format(selectedDate))
+                }
+
+                // 时间选择
+                Text("具体时间", style = MaterialTheme.typography.labelLarge)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    OutlinedTextField(value = String.format("%02d", hour), onValueChange = { it.toIntOrNull()?.let { h -> if (h in 0..23) { hour = h; updateDateTime(selectedDate.time) } } }, label = { Text("时") }, singleLine = true, modifier = Modifier.width(72.dp))
+                    Text(":", style = MaterialTheme.typography.titleLarge)
+                    OutlinedTextField(value = String.format("%02d", minute), onValueChange = { it.toIntOrNull()?.let { m -> if (m in 0..59) { minute = m; updateDateTime(selectedDate.time) } } }, label = { Text("分") }, singleLine = true, modifier = Modifier.width(72.dp))
                 }
             }
         },
@@ -591,7 +575,8 @@ fun AddExamDialog(
             TextButton(
                 onClick = {
                     if (name.isNotBlank()) {
-                        onSave(Exam(name = name, courseId = selectedCourseId, examDate = selectedDate.time))
+                        updateDateTime(selectedDate.time)
+                        onSave(Exam(name = name.trim(), courseId = selectedCourseId, examDate = selectedDate.time))
                     }
                 },
                 enabled = name.isNotBlank(),
@@ -606,11 +591,7 @@ fun AddExamDialog(
             confirmButton = {
                 TextButton(onClick = {
                     datePickerState.selectedDateMillis?.let { millis ->
-                        val cal = Calendar.getInstance()
-                        cal.timeInMillis = millis
-                        cal.set(Calendar.HOUR_OF_DAY, selectedDate.hours)
-                        cal.set(Calendar.MINUTE, selectedDate.minutes)
-                        selectedDate = cal.time
+                        updateDateTime(millis)
                     }
                     showDatePicker = false
                 }) { Text("确定") }

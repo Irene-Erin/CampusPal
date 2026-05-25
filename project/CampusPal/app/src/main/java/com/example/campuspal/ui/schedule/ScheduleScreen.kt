@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.campuspal.data.db.entity.Course
 import com.example.campuspal.ui.theme.CourseColors
+import com.example.campuspal.ui.components.AppDimens
 import java.util.*
 
 // 时间段定义
@@ -55,12 +56,15 @@ fun ScheduleScreen(viewModel: ScheduleViewModel) {
             onNext = { viewModel.nextWeek() },
         )
 
-        // 周视图网格
-        WeekGrid(
-            currentWeek = uiState.currentWeek,
-            viewModel = viewModel,
-            onCourseClick = { viewModel.showDetail(it) },
-        )
+        // 周视图网格 — 平板自适应
+        BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+            WeekGrid(
+                currentWeek = uiState.currentWeek,
+                maxWidth = maxWidth,
+                viewModel = viewModel,
+                onCourseClick = { viewModel.showDetail(it) },
+            )
+        }
     }
 
     // 悬浮按钮 — 现代化设计
@@ -157,12 +161,15 @@ fun WeekSelector(currentWeek: Int, onPrev: () -> Unit, onNext: () -> Unit) {
 @Composable
 fun WeekGrid(
     currentWeek: Int,
+    maxWidth: androidx.compose.ui.unit.Dp,
     viewModel: ScheduleViewModel,
     onCourseClick: (Course) -> Unit,
 ) {
-    val slotHeight = 60.dp
-    val timeWidth = 52.dp
-    val dayWidth = 120.dp
+    val slotHeight = AppDimens.scheduleSlotHeight
+    val timeWidth = AppDimens.scheduleTimeWidth
+    // 平板使用更宽的日列
+    val isTablet = maxWidth > 840.dp
+    val dayWidth = if (isTablet) AppDimens.scheduleDayWidthTablet else AppDimens.scheduleDayWidthPhone
 
     // 为每一天加载课程
     val dayCoursesMap = remember(currentWeek) {

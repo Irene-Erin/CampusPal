@@ -42,9 +42,22 @@ interface ExpenseDao {
 
     @Query("DELETE FROM expenses WHERE id = :id")
     suspend fun deleteById(id: Long)
+
+    // 月度收支统计（学期柱状图用）
+    @Query("SELECT SUM(amount) FROM expenses WHERE type = 'expense' AND timestamp BETWEEN :start AND :end")
+    fun getRawTotalExpense(start: Long, end: Long): Double?
+
+    @Query("SELECT SUM(amount) FROM expenses WHERE type = 'income' AND timestamp BETWEEN :start AND :end")
+    fun getRawTotalIncome(start: Long, end: Long): Double?
 }
 
 data class CategorySum(
     val category: String,
     val total: Double,
+)
+
+data class MonthlyBreakdown(
+    val yearMonth: String,
+    val expenseTotal: Double,
+    val incomeTotal: Double,
 )

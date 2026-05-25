@@ -24,8 +24,20 @@ class SettingsDataStore(private val context: Context) {
         prefs[COLOR_SCHEME_KEY] ?: "SUNSET"
     }
 
+    val themeMode: Flow<String> = context.dataStore.data.map { prefs ->
+        prefs[THEME_MODE_KEY] ?: "SYSTEM"
+    }
+
     val gpaStandard: Flow<String> = context.dataStore.data.map { prefs ->
         prefs[GPA_STANDARD_KEY] ?: "4.0"
+    }
+
+    val semesterStart: Flow<Long> = context.dataStore.data.map { prefs ->
+        prefs[SEMESTER_START_KEY] ?: getDefaultSemesterStart()
+    }
+
+    val semesterEnd: Flow<Long> = context.dataStore.data.map { prefs ->
+        prefs[SEMESTER_END_KEY] ?: getDefaultSemesterEnd()
     }
 
     suspend fun setMonthlyBudget(amount: Double) {
@@ -43,6 +55,24 @@ class SettingsDataStore(private val context: Context) {
     suspend fun setColorScheme(scheme: String) {
         context.dataStore.edit { prefs ->
             prefs[COLOR_SCHEME_KEY] = scheme
+        }
+    }
+
+    suspend fun setThemeMode(mode: String) {
+        context.dataStore.edit { prefs ->
+            prefs[THEME_MODE_KEY] = mode
+        }
+    }
+
+    suspend fun setSemesterStart(timestamp: Long) {
+        context.dataStore.edit { prefs ->
+            prefs[SEMESTER_START_KEY] = timestamp
+        }
+    }
+
+    suspend fun setSemesterEnd(timestamp: Long) {
+        context.dataStore.edit { prefs ->
+            prefs[SEMESTER_END_KEY] = timestamp
         }
     }
 
@@ -78,5 +108,22 @@ class SettingsDataStore(private val context: Context) {
         private val IS_DARK_THEME_KEY = booleanPreferencesKey("is_dark_theme")
         private val COLOR_SCHEME_KEY = stringPreferencesKey("color_scheme")
         private val GPA_STANDARD_KEY = stringPreferencesKey("gpa_standard")
+        private val THEME_MODE_KEY = stringPreferencesKey("theme_mode")
+        private val SEMESTER_START_KEY = longPreferencesKey("semester_start")
+        private val SEMESTER_END_KEY = longPreferencesKey("semester_end")
+
+        private fun getDefaultSemesterStart(): Long {
+            val cal = java.util.Calendar.getInstance()
+            cal.set(cal.get(java.util.Calendar.YEAR), java.util.Calendar.SEPTEMBER, 1, 0, 0, 0)
+            cal.set(java.util.Calendar.MILLISECOND, 0)
+            return cal.timeInMillis
+        }
+
+        private fun getDefaultSemesterEnd(): Long {
+            val cal = java.util.Calendar.getInstance()
+            cal.set(cal.get(java.util.Calendar.YEAR) + 1, java.util.Calendar.JANUARY, 31, 23, 59, 59)
+            cal.set(java.util.Calendar.MILLISECOND, 999)
+            return cal.timeInMillis
+        }
     }
 }

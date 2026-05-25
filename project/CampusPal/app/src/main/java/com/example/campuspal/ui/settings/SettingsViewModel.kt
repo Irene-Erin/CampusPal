@@ -15,10 +15,14 @@ import java.io.*
 
 data class SettingsUiState(
     val isDarkTheme: Boolean = false,
-    val colorScheme: String = "CAMPUS",
+    val colorScheme: String = "SUNSET",
+    val themeMode: String = "SYSTEM",
     val gpaStandard: String = "4.0",
     val monthlyBudget: Double = 2000.0,
+    val semesterStart: Long = 0L,
+    val semesterEnd: Long = 0L,
     val showBudgetDialog: Boolean = false,
+    val showSemesterDialog: Boolean = false,
     val exportMessage: String? = null,
     val importMessage: String? = null,
 )
@@ -29,27 +33,37 @@ class SettingsViewModel(
 ) : ViewModel() {
 
     private val _showBudgetDialog = MutableStateFlow(false)
+    private val _showSemesterDialog = MutableStateFlow(false)
     private val _exportMessage = MutableStateFlow<String?>(null)
     private val _importMessage = MutableStateFlow<String?>(null)
 
     val uiState: StateFlow<SettingsUiState> = combine(
         settingsDataStore.isDarkTheme,
         settingsDataStore.colorScheme,
+        settingsDataStore.themeMode,
         settingsDataStore.gpaStandard,
         settingsDataStore.monthlyBudget,
-        _showBudgetDialog,
-    ) { dark, scheme, gpa, budget, showBudget ->
-        mutableListOf<Any?>(dark, scheme, gpa, budget, showBudget)
+    ) { dark, scheme, tMode, gpa, budget ->
+        mutableListOf<Any?>(dark, scheme, tMode, gpa, budget)
+    }.combine(_showBudgetDialog) { list, showBudget ->
+        list.apply { add(showBudget) }
+    }.combine(settingsDataStore.semesterStart) { list, ss ->
+        list.apply { add(ss) }
+    }.combine(settingsDataStore.semesterEnd) { list, se ->
+        list.apply { add(se) }
     }.combine(_exportMessage) { list, export ->
         list.apply { add(export) }
     }.combine(_importMessage) { list, import ->
         SettingsUiState(
             isDarkTheme = list[0] as Boolean,
             colorScheme = list[1] as String,
-            gpaStandard = list[2] as String,
-            monthlyBudget = list[3] as Double,
-            showBudgetDialog = list[4] as Boolean,
-            exportMessage = list[5] as String?,
+            themeMode = list[2] as String,
+            gpaStandard = list[3] as String,
+            monthlyBudget = list[4] as Double,
+            showBudgetDialog = list[5] as Boolean,
+            semesterStart = list[6] as Long,
+            semesterEnd = list[7] as Long,
+            exportMessage = list[8] as String?,
             importMessage = import,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), SettingsUiState())
@@ -62,16 +76,30 @@ class SettingsViewModel(
         viewModelScope.launch { settingsDataStore.setColorScheme(scheme) }
     }
 
+    fun setThemeMode(mode: String) {
+        viewModelScope.launch { settingsDataStore.setThemeMode(mode) }
+    }
+
     fun setGpaStandard(standard: String) {
         viewModelScope.launch { settingsDataStore.setGpaStandard(standard) }
     }
 
     fun showBudgetDialog() { _showBudgetDialog.value = true }
     fun hideBudgetDialog() { _showBudgetDialog.value = false }
+    fun showSemesterDialog() { _showSemesterDialog.value = true }
+    fun hideSemesterDialog() { _showSemesterDialog.value = false }
     fun setBudget(amount: Double) {
         viewModelScope.launch {
             settingsDataStore.setMonthlyBudget(amount)
             _showBudgetDialog.value = false
+        }
+    }
+
+    fun setSemesterRange(start: Long, end: Long) {
+        viewModelScope.launch {
+            settingsDataStore.setSemesterStart(start)
+            settingsDataStore.setSemesterEnd(end)
+            _showSemesterDialog.value = false
         }
     }
 

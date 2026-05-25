@@ -27,6 +27,7 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
+    var showSemesterDialog by remember { mutableStateOf(false) }
 
     // 文件选择器
     val filePickerLauncher = rememberLauncherForActivityResult(
@@ -60,19 +61,22 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                 SettingsGroupTitle("外观")
             }
 
-            // 深色主题
+            // 主题模式
             item {
-                SettingsItem(
-                    icon = Icons.Filled.DarkMode,
-                    title = "深色主题",
-                    subtitle = if (uiState.isDarkTheme) "已开启" else "已关闭",
-                    trailing = {
-                        Switch(
-                            checked = uiState.isDarkTheme,
-                            onCheckedChange = { viewModel.setDarkTheme(it) },
+                Text("主题模式", style = MaterialTheme.typography.labelLarge)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf(
+                        "SYSTEM" to "跟随系统",
+                        "LIGHT" to "浅色",
+                        "DARK" to "深色",
+                    ).forEach { (value, label) ->
+                        FilterChip(
+                            selected = uiState.themeMode == value,
+                            onClick = { viewModel.setThemeMode(value) },
+                            label = { Text(label) },
                         )
-                    },
-                )
+                    }
+                }
             }
 
             // 配色方案
@@ -153,6 +157,17 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                 )
             }
 
+            // 学期日期
+            item {
+                val sdf = java.text.SimpleDateFormat("yyyy/MM/dd", java.util.Locale.getDefault())
+                SettingsItem(
+                    icon = Icons.Filled.DateRange,
+                    title = "学期日期",
+                    subtitle = if (uiState.semesterStart > 0L) "${sdf.format(java.util.Date(uiState.semesterStart))} - ${sdf.format(java.util.Date(uiState.semesterEnd))}" else "未设置",
+                    onClick = { showSemesterDialog = true },
+                )
+            }
+
             // 导出数据
             item {
                 SettingsItem(
@@ -219,6 +234,16 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
             currentBudget = uiState.monthlyBudget,
             onDismiss = { viewModel.hideBudgetDialog() },
             onSave = { viewModel.setBudget(it) },
+        )
+    }
+
+    // 学期日期对话框
+    if (showSemesterDialog) {
+        SemesterRangeDialog(
+            currentStart = uiState.semesterStart,
+            currentEnd = uiState.semesterEnd,
+            onDismiss = { showSemesterDialog = false },
+            onSave = { start, end -> viewModel.setSemesterRange(start, end); showSemesterDialog = false },
         )
     }
 }
@@ -311,4 +336,63 @@ fun BudgetDialog(
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } },
     )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun SemesterRangeDialog(
+    currentStart: Long,
+    currentEnd: Long,
+    onDismiss: () -> Unit,
+    onSave: (Long, Long) -> Unit,
+) {
+    var pickingStart by remember { mutableStateOf(true) }
+    var startMillis by remember { mutableStateOf(if (currentStart > 0) currentStart else System.currentTimeMillis()) }
+    var endMillis by remember { mutableStateOf(if (currentEnd > 0) currentEnd else System.currentTimeMillis() + 120L * 24 * 3600 * 1000) }
+    var showStartPicker by remember { mutableStateOf(false) }
+    var showEndPicker by remember { mutableStateOf(false) }
+
+    val sdf = java.text.SimpleDateFormat("yyyy/MM/dd", java.util.Locale.getDefault())
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("设置学期日期") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("开始日期", style = MaterialTheme.typography.labelLarge)
+                TextButton(onClick = { showStartPicker = true }) {
+                    Icon(Icons.Filled.CalendarToday, null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text(sdf.format(java.util.Date(startMillis)), fontWeight = FontWeight.Medium)
+                }
+                Text("结束日期", style = MaterialTheme.typography.labelLarge)
+                TextButton(onClick = { showEndPicker = true }) {
+                    Icon(Icons.Filled.CalendarToday, null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text(sdf.format(java.util.Date(endMillis)), fontWeight = FontWeight.Medium)
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onSave(startMillis, endMillis) }) { Text("保存") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } },
+    )
+
+    if (showStartPicker) {
+        val dps = rememberDatePickerState(initialSelectedDateMillis = startMillis)
+        DatePickerDialog(
+            onDismissRequest = { showStartPicker = false },
+            confirmButton = { TextButton(onClick = { dps.selectedDateMillis?.let { startMillis = it }; showStartPicker = false }) { Text("确定") } },
+            dismissButton = { TextButton(onClick = { showStartPicker = false }) { Text("取消") } },
+        ) { DatePicker(state = dps) }
+    }
+    if (showEndPicker) {
+        val dps = rememberDatePickerState(initialSelectedDateMillis = endMillis)
+        DatePickerDialog(
+            onDismissRequest = { showEndPicker = false },
+            confirmButton = { TextButton(onClick = { dps.selectedDateMillis?.let { endMillis = it }; showEndPicker = false }) { Text("确定") } },
+            dismissButton = { TextButton(onClick = { showEndPicker = false }) { Text("取消") } },
+        ) { DatePicker(state = dps) }
+    }
 }
