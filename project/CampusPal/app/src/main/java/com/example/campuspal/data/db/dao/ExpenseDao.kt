@@ -45,10 +45,10 @@ interface ExpenseDao {
 
     // 月度收支统计（学期柱状图用）
     @Query("SELECT SUM(amount) FROM expenses WHERE type = 'expense' AND timestamp BETWEEN :start AND :end")
-    fun getRawTotalExpense(start: Long, end: Long): Double?
+    suspend fun getRawTotalExpense(start: Long, end: Long): Double?
 
     @Query("SELECT SUM(amount) FROM expenses WHERE type = 'income' AND timestamp BETWEEN :start AND :end")
-    fun getRawTotalIncome(start: Long, end: Long): Double?
+    suspend fun getRawTotalIncome(start: Long, end: Long): Double?
 }
 
 data class CategorySum(

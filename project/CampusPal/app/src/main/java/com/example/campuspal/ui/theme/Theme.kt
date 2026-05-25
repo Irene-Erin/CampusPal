@@ -141,11 +141,9 @@ fun CampusPalTheme(
 
     val colorScheme = when {
         isDarkTheme -> midnightColorScheme()
-        Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-            when {
-                isDarkTheme -> dynamicDarkColorScheme(context)
-                else -> dynamicLightColorScheme(context)
-            }
+        Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+            colorSchemeType == ColorSchemeType.SUNSET -> {
+            if (isDarkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
         }
         else -> when (colorSchemeType) {
             ColorSchemeType.OCEAN -> oceanColorScheme()

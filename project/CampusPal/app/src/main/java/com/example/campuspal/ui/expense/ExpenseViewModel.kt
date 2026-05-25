@@ -23,16 +23,13 @@ data class ExpenseUiState(
     val monthlyBudget: Double = 2000.0,
     val currentView: ExpenseView = ExpenseView.MONTH,
     val isRefreshing: Boolean = false,
-    // 日视图
     val selectedDate: Long = System.currentTimeMillis(),
-    // 学期视图
     val semesterStart: Long = 0L,
     val semesterEnd: Long = 0L,
     val monthlyBreakdowns: List<MonthlyBreakdown> = emptyList(),
     val semesterCategorySums: List<CategorySum> = emptyList(),
     val semesterTotalExpense: Double = 0.0,
     val semesterTotalIncome: Double = 0.0,
-    // 编辑
     val editingExpense: Expense? = null,
 )
 
@@ -88,70 +85,57 @@ class ExpenseViewModel(
 
     private fun getTodayMidnight(): Long = startOfDay(System.currentTimeMillis())
 
-    // 根据当前视图计算时间范围
-    private val currentRange: Pair<Long, Long>
-        get() {
-            val t = _selectedDate.value
-            return when (_currentView.value) {
-                ExpenseView.DAY -> startOfDay(t) to endOfDay(t)
-                ExpenseView.WEEK -> startOfWeek(t) to endOfWeek(t)
-                ExpenseView.MONTH -> startOfMonth(t) to endOfMonth(t)
-                ExpenseView.SEMESTER -> {
-                    // 学期范围从 DataStore 读取，不依赖 selectedDate
-                    runBlocking {
-                        settingsDataStore.semesterStart.first() to settingsDataStore.semesterEnd.first()
-                    }
-                }
-            }
-        }
+    // 学期范围 (从 DataStore 读取，缓存为 StateFlow)
+    private val semesterRange: StateFlow<Pair<Long, Long>> = combine(
+        settingsDataStore.semesterStart,
+        settingsDataStore.semesterEnd,
+    ) { start, end -> start to end }.stateIn(viewModelScope, SharingStarted.Eagerly, 0L to 0L)
 
-    // 数据层 combine（月/周/日视图共享此逻辑，仅时间范围不同）
-    private val rangeData: StateFlow<Triple<List<Expense>, List<CategorySum>, Double?>> = combine(
-        _currentView, _selectedDate,
-    ) { view, date -> view to date }.flatMapLatest { (view, date) ->
-        val (start, end) = when (view) {
-            ExpenseView.DAY -> startOfDay(date) to endOfDay(date)
-            ExpenseView.WEEK -> startOfWeek(date) to endOfWeek(date)
-            ExpenseView.MONTH -> startOfMonth(date) to endOfMonth(date)
-            ExpenseView.SEMESTER -> runBlocking {
-                settingsDataStore.semesterStart.first() to settingsDataStore.semesterEnd.first()
-            }
-        }
-        combine(
-            expenseDao.getExpensesByMonth(start, end),
-            expenseDao.getCategorySumBetween(start, end),
-            expenseDao.getTotalExpenseBetween(start, end),
-        ) { exps, cats, total -> Triple(exps, cats, total) }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), Triple(emptyList(), emptyList(), null))
+    // 根据视图计算时间范围 (不阻塞线程)
+    private data class TimeRange(val start: Long, val end: Long)
 
-    private val rangeIncome: StateFlow<Double?> = combine(_currentView, _selectedDate) { view, date -> view to date }
-        .flatMapLatest { (view, date) ->
-            val (start, end) = when (view) {
-                ExpenseView.DAY -> startOfDay(date) to endOfDay(date)
-                ExpenseView.WEEK -> startOfWeek(date) to endOfWeek(date)
-                ExpenseView.MONTH -> startOfMonth(date) to endOfMonth(date)
-                ExpenseView.SEMESTER -> runBlocking {
-                    settingsDataStore.semesterStart.first() to settingsDataStore.semesterEnd.first()
-                }
-            }
+    private val activeRange: StateFlow<TimeRange> = combine(
+        _currentView, _selectedDate, semesterRange,
+    ) { view, date, (semStart, semEnd) ->
+        when (view) {
+            ExpenseView.DAY -> TimeRange(startOfDay(date), endOfDay(date))
+            ExpenseView.WEEK -> TimeRange(startOfWeek(date), endOfWeek(date))
+            ExpenseView.MONTH -> TimeRange(startOfMonth(date), endOfMonth(date))
+            ExpenseView.SEMESTER -> TimeRange(semStart, semEnd)
+        }
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, TimeRange(getTodayMidnight(), getTodayMidnight()))
+
+    // 支出/分类数据
+    private val rangeData: StateFlow<Triple<List<Expense>, List<CategorySum>, Double?>> =
+        activeRange.flatMapLatest { (start, end) ->
+            combine(
+                expenseDao.getExpensesByMonth(start, end),
+                expenseDao.getCategorySumBetween(start, end),
+                expenseDao.getTotalExpenseBetween(start, end),
+            ) { exps, cats, total -> Triple(exps, cats, total) }
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), Triple(emptyList(), emptyList(), null))
+
+    // 收入数据
+    private val rangeIncome: StateFlow<Double?> =
+        activeRange.flatMapLatest { (start, end) ->
             expenseDao.getTotalIncomeBetween(start, end)
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
     // 学期月度柱状图数据
-    private val monthBreakdowns: StateFlow<List<MonthlyBreakdown>> = _currentView
-        .flatMapLatest { view ->
+    private val monthBreakdowns: StateFlow<List<MonthlyBreakdown>> = combine(
+        _currentView, semesterRange,
+    ) { view, (semStart, semEnd) -> view to (semStart to semEnd) }
+        .flatMapLatest { (view, range) ->
             if (view != ExpenseView.SEMESTER) flowOf(emptyList())
             else flow {
-                val (start, end) = runBlocking {
-                    settingsDataStore.semesterStart.first() to settingsDataStore.semesterEnd.first()
-                }
+                val (start, end) = range
                 val result = mutableListOf<MonthlyBreakdown>()
                 val cal = Calendar.getInstance().apply { timeInMillis = start }
                 while (cal.timeInMillis <= end) {
                     val ms = startOfMonth(cal.timeInMillis)
                     val me = endOfMonth(cal.timeInMillis)
-                    val expTotal = expenseDao.getRawTotalExpense(ms, me) ?: 0.0
-                    val incTotal = expenseDao.getRawTotalIncome(ms, me) ?: 0.0
+                    val expTotal = withContext(Dispatchers.IO) { expenseDao.getRawTotalExpense(ms, me) } ?: 0.0
+                    val incTotal = withContext(Dispatchers.IO) { expenseDao.getRawTotalIncome(ms, me) } ?: 0.0
                     val label = SimpleDateFormat("M月", Locale.getDefault()).format(Date(ms))
                     if (expTotal > 0 || incTotal > 0) {
                         result.add(MonthlyBreakdown(label, expTotal, incTotal))
@@ -163,13 +147,13 @@ class ExpenseViewModel(
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     // 学期分类汇总
-    private val semesterCats: StateFlow<List<CategorySum>> = _currentView
-        .flatMapLatest { view ->
+    private val semesterCats: StateFlow<List<CategorySum>> = combine(
+        _currentView, semesterRange,
+    ) { view, (semStart, semEnd) -> view to (semStart to semEnd) }
+        .flatMapLatest { (view, range) ->
             if (view != ExpenseView.SEMESTER) flowOf(emptyList())
             else {
-                val (start, end) = runBlocking {
-                    settingsDataStore.semesterStart.first() to settingsDataStore.semesterEnd.first()
-                }
+                val (start, end) = range
                 expenseDao.getCategorySumBetween(start, end)
             }
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -195,6 +179,8 @@ class ExpenseViewModel(
             val semEnd = acc[7] as Long
             val bds = acc[8] as List<MonthlyBreakdown>
             val semCats = acc[9] as List<CategorySum>
+            // semesterCats 已包含学期总支出，收入使用学期范围计算
+            val semTotalInc = if (view == ExpenseView.SEMESTER) income ?: 0.0 else 0.0
             ExpenseUiState(
                 expenses = data.first,
                 categorySums = data.second,
@@ -209,7 +195,7 @@ class ExpenseViewModel(
                 monthlyBreakdowns = bds,
                 semesterCategorySums = semCats,
                 semesterTotalExpense = semCats.sumOf { it.total },
-                semesterTotalIncome = income ?: 0.0,
+                semesterTotalIncome = semTotalInc,
                 editingExpense = editing,
             )
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), ExpenseUiState())
