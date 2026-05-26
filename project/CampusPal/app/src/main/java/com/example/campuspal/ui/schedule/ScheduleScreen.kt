@@ -55,7 +55,7 @@ fun ScheduleScreen(viewModel: ScheduleViewModel) {
             currentWeek = uiState.currentWeek,
             onPrev = { viewModel.prevWeek() },
             onNext = { viewModel.nextWeek() },
-            onJumpToToday = { viewModel.jumpToWeek(1) },
+            onJumpToToday = { viewModel.jumpToToday() },
         )
 
         // 周视图网格 — 平板自适应

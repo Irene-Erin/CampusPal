@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.campuspal.data.db.dao.CourseDao
 import com.example.campuspal.data.db.entity.Course
+import com.example.campuspal.data.datastore.SettingsDataStore
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
@@ -20,7 +21,10 @@ data class ScheduleUiState(
     val isLoading: Boolean = false,
 )
 
-class ScheduleViewModel(private val courseDao: CourseDao) : ViewModel() {
+class ScheduleViewModel(
+    private val courseDao: CourseDao,
+    private val settingsDataStore: SettingsDataStore,
+) : ViewModel() {
 
     private val _currentWeek = MutableStateFlow(1)
     private val _selectedCourse = MutableStateFlow<Course?>(null)
@@ -30,6 +34,17 @@ class ScheduleViewModel(private val courseDao: CourseDao) : ViewModel() {
     private val _conflictWarning = MutableStateFlow<String?>(null)
     private val _pendingCourse = MutableStateFlow<Course?>(null)
     private val _isLoading = MutableStateFlow(false)
+
+    // 真实当前周数
+    private val realCurrentWeek: StateFlow<Int> = settingsDataStore.semesterStart.map { ms ->
+        WeekCalculator.calculateCurrentWeek(ms)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 1)
+
+    init {
+        viewModelScope.launch {
+            realCurrentWeek.collect { w -> if (_currentWeek.value == 1) _currentWeek.value = w }
+        }
+    }
 
     val uiState: StateFlow<ScheduleUiState> = combine(
         _currentWeek,
@@ -163,10 +178,17 @@ class ScheduleViewModel(private val courseDao: CourseDao) : ViewModel() {
         _currentWeek.value = week.coerceIn(1, 20)
     }
 
-    class Factory(private val courseDao: CourseDao) : ViewModelProvider.Factory {
+    fun jumpToToday() {
+        _currentWeek.value = realCurrentWeek.value
+    }
+
+    class Factory(
+        private val courseDao: CourseDao,
+        private val settingsDataStore: SettingsDataStore,
+    ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
-            return ScheduleViewModel(courseDao) as T
+            return ScheduleViewModel(courseDao, settingsDataStore) as T
         }
     }
 }

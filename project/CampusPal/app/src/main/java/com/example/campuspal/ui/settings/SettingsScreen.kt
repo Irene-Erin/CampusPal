@@ -192,6 +192,17 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                 )
             }
 
+            // 课程提醒
+            item {
+                SettingsSwitchItem(
+                    icon = Icons.Filled.Notifications,
+                    title = "课程提醒",
+                    subtitle = "每节课开始前 10 分钟提醒",
+                    checked = uiState.courseReminderEnabled,
+                    onCheckedChange = { viewModel.setCourseReminderEnabled(it) },
+                )
+            }
+
             // 导出数据
             item {
                 SettingsItem(

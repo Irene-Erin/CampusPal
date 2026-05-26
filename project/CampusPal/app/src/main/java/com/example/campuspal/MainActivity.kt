@@ -64,7 +64,7 @@ class MainActivity : ComponentActivity() {
 fun MainScreen(app: CampusPalApp) {
     val navController = rememberNavController()
 
-    val scheduleViewModel = remember { ScheduleViewModel(app.database.courseDao()) }
+    val scheduleViewModel = remember { ScheduleViewModel(app.database.courseDao(), app.settingsDataStore) }
     val todoViewModel = remember { TodoViewModel(app.database.taskDao()) }
     val expenseViewModel = remember { ExpenseViewModel(app.database.expenseDao(), app.settingsDataStore) }
     val learnViewModel = remember { LearnViewModel(app.database.examDao(), app.database.studySessionDao(), app.database.courseDao()) }

@@ -23,6 +23,7 @@ data class SettingsUiState(
     val semesterEnd: Long = 0L,
     val showWeekend: Boolean = true,
     val showNonCurrentWeek: Boolean = false,
+    val courseReminderEnabled: Boolean = true,
     val showBudgetDialog: Boolean = false,
     val showSemesterDialog: Boolean = false,
     val exportMessage: String? = null,
@@ -60,6 +61,8 @@ class SettingsViewModel(
     }.combine(settingsDataStore.showWeekend) { list, showWk ->
         list.apply { add(showWk) }
     }.combine(settingsDataStore.showNonCurrentWeek) { list, showNon ->
+        list.apply { add(showNon) }
+    }.combine(settingsDataStore.courseReminderEnabled) { list, reminder ->
         SettingsUiState(
             isDarkTheme = list[0] as Boolean,
             colorScheme = list[1] as String,
@@ -72,7 +75,8 @@ class SettingsViewModel(
             exportMessage = list[8] as String?,
             importMessage = list[9] as String?,
             showWeekend = list[10] as Boolean,
-            showNonCurrentWeek = showNon,
+            showNonCurrentWeek = list[11] as Boolean,
+            courseReminderEnabled = reminder,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), SettingsUiState())
 
@@ -117,6 +121,10 @@ class SettingsViewModel(
 
     fun setShowNonCurrentWeek(show: Boolean) {
         viewModelScope.launch { settingsDataStore.setShowNonCurrentWeek(show) }
+    }
+
+    fun setCourseReminderEnabled(enabled: Boolean) {
+        viewModelScope.launch { settingsDataStore.setCourseReminderEnabled(enabled) }
     }
 
     fun clearMessages() {
