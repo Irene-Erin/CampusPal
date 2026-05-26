@@ -28,6 +28,7 @@ import com.example.campuspal.data.db.dao.StudyStat
 import com.example.campuspal.data.db.entity.Course
 import com.example.campuspal.data.db.entity.Exam
 import com.example.campuspal.ui.components.CountdownTimer
+import com.example.campuspal.ui.learn.ExamForm
 import com.example.campuspal.ui.theme.*
 import com.example.campuspal.worker.ExamReminderWorker
 import java.text.SimpleDateFormat
@@ -90,7 +91,8 @@ fun LearnScreen(viewModel: LearnViewModel) {
     // 添加考试对话框
     val context = androidx.compose.ui.platform.LocalContext.current
     if (showAddExamDialog) {
-        AddExamDialog(
+        ExamForm(
+            editingExam = null,
             courses = uiState.courses,
             onDismiss = { viewModel.hideAddExam() },
             onSave = {
@@ -513,90 +515,5 @@ fun StudyStatsSection(
                 }
             }
         }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun AddExamDialog(
-    courses: List<Course>,
-    onDismiss: () -> Unit,
-    onSave: (Exam) -> Unit,
-) {
-    var name by remember { mutableStateOf("") }
-    var selectedCourseId by remember { mutableStateOf<Long?>(null) }
-    var showDatePicker by remember { mutableStateOf(false) }
-    var selectedDate by remember { mutableStateOf(Date()) }
-    var hour by remember { mutableStateOf(Calendar.getInstance().get(Calendar.HOUR_OF_DAY)) }
-    var minute by remember { mutableStateOf(Calendar.getInstance().get(Calendar.MINUTE)) }
-
-    fun updateDateTime(dateMillis: Long) {
-        val cal = Calendar.getInstance().apply { timeInMillis = dateMillis }
-        cal.set(Calendar.HOUR_OF_DAY, hour)
-        cal.set(Calendar.MINUTE, minute)
-        selectedDate = cal.time
-    }
-
-    val datePickerState = rememberDatePickerState(initialSelectedDateMillis = System.currentTimeMillis())
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("添加考试") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("考试名称 *") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-
-                if (courses.isNotEmpty()) {
-                    Text("关联课程", style = MaterialTheme.typography.labelLarge)
-                    Row(modifier = Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        FilterChip(selected = selectedCourseId == null, onClick = { selectedCourseId = null }, label = { Text("无", fontSize = 12.sp) })
-                        courses.take(6).forEach { course ->
-                            FilterChip(selected = selectedCourseId == course.id, onClick = { selectedCourseId = course.id }, label = { Text(course.name, fontSize = 12.sp) })
-                        }
-                    }
-                }
-
-                // 日期
-                TextButton(onClick = { showDatePicker = true }) {
-                    Icon(Icons.Filled.CalendarToday, null, modifier = Modifier.size(18.dp)); Spacer(Modifier.width(8.dp))
-                    Text(SimpleDateFormat("yyyy/MM/dd", Locale.getDefault()).format(selectedDate))
-                }
-
-                // 时间选择
-                Text("具体时间", style = MaterialTheme.typography.labelLarge)
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    OutlinedTextField(value = String.format("%02d", hour), onValueChange = { it.toIntOrNull()?.let { h -> if (h in 0..23) { hour = h; updateDateTime(selectedDate.time) } } }, label = { Text("时") }, singleLine = true, modifier = Modifier.width(72.dp))
-                    Text(":", style = MaterialTheme.typography.titleLarge)
-                    OutlinedTextField(value = String.format("%02d", minute), onValueChange = { it.toIntOrNull()?.let { m -> if (m in 0..59) { minute = m; updateDateTime(selectedDate.time) } } }, label = { Text("分") }, singleLine = true, modifier = Modifier.width(72.dp))
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(
-                onClick = {
-                    if (name.isNotBlank()) {
-                        updateDateTime(selectedDate.time)
-                        onSave(Exam(name = name.trim(), courseId = selectedCourseId, examDate = selectedDate.time))
-                    }
-                },
-                enabled = name.isNotBlank(),
-            ) { Text("保存") }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } },
-    )
-
-    if (showDatePicker) {
-        DatePickerDialog(
-            onDismissRequest = { showDatePicker = false },
-            confirmButton = {
-                TextButton(onClick = {
-                    datePickerState.selectedDateMillis?.let { millis ->
-                        updateDateTime(millis)
-                    }
-                    showDatePicker = false
-                }) { Text("确定") }
-            },
-            dismissButton = { TextButton(onClick = { showDatePicker = false }) { Text("取消") } },
-        ) { DatePicker(state = datePickerState) }
     }
 }

@@ -26,6 +26,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.campuspal.data.db.entity.Task
+import com.example.campuspal.ui.todo.TodoForm
 import com.example.campuspal.ui.theme.PriorityColors
 import com.google.accompanist.swiperefresh.SwipeRefresh
 import com.google.accompanist.swiperefresh.rememberSwipeRefreshState
@@ -102,7 +103,8 @@ fun TodoScreen(viewModel: TodoViewModel) {
 
     // 添加任务对话框
     if (uiState.showAddDialog) {
-        AddTaskDialog(
+        TodoForm(
+            editingTask = null,
             courses = uiState.courses,
             onDismiss = { viewModel.hideAddDialog() },
             onSave = { viewModel.addTask(it) },
@@ -312,144 +314,6 @@ fun SwipeToDismissTaskItem(
                     )
                 }
             }
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun AddTaskDialog(
-    courses: List<com.example.campuspal.data.db.entity.Course>,
-    onDismiss: () -> Unit,
-    onSave: (Task) -> Unit,
-) {
-    var title by remember { mutableStateOf("") }
-    var description by remember { mutableStateOf("") }
-    var priority by remember { mutableStateOf(0) }
-    var selectedCourseId by remember { mutableStateOf<Long?>(null) }
-    var hasDeadline by remember { mutableStateOf(false) }
-    var deadlineDate by remember { mutableStateOf(Date()) }
-    var showDatePicker by remember { mutableStateOf(false) }
-
-    val datePickerState = rememberDatePickerState()
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("添加待办") },
-        text = {
-            Column(
-                modifier = Modifier.heightIn(max = 400.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                OutlinedTextField(
-                    value = title,
-                    onValueChange = { title = it },
-                    label = { Text("标题 *") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                OutlinedTextField(
-                    value = description,
-                    onValueChange = { description = it },
-                    label = { Text("描述") },
-                    modifier = Modifier.fillMaxWidth(),
-                    maxLines = 3,
-                )
-
-                // 优先级选择
-                Text("优先级", style = MaterialTheme.typography.labelLarge)
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    listOf("无" to 0, "低" to 1, "中" to 2, "高" to 3).forEach { (label, value) ->
-                        FilterChip(
-                            selected = priority == value,
-                            onClick = { priority = value },
-                            label = { Text(label) },
-                        )
-                    }
-                }
-
-                // 截止日期
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text("设置截止日期", modifier = Modifier.weight(1f))
-                    Switch(checked = hasDeadline, onCheckedChange = { hasDeadline = it })
-                }
-                if (hasDeadline) {
-                    TextButton(onClick = { showDatePicker = true }) {
-                        Icon(Icons.Filled.CalendarToday, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(SimpleDateFormat("yyyy/MM/dd", Locale.getDefault()).format(deadlineDate))
-                    }
-                }
-
-                // 关联课程
-                if (courses.isNotEmpty()) {
-                    Text("关联课程", style = MaterialTheme.typography.labelLarge)
-                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        FilterChip(
-                            selected = selectedCourseId == null,
-                            onClick = { selectedCourseId = null },
-                            label = { Text("无") },
-                        )
-                        courses.take(5).forEach { course ->
-                            FilterChip(
-                                selected = selectedCourseId == course.id,
-                                onClick = { selectedCourseId = course.id },
-                                label = { Text(course.name, fontSize = 12.sp) },
-                            )
-                        }
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(
-                onClick = {
-                    if (title.isNotBlank()) {
-                        onSave(
-                            Task(
-                                title = title,
-                                description = description,
-                                priority = priority,
-                                deadline = if (hasDeadline) deadlineDate else null,
-                                courseId = selectedCourseId,
-                            )
-                        )
-                    }
-                },
-                enabled = title.isNotBlank(),
-            ) {
-                Text("保存")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text("取消") }
-        },
-    )
-
-    // 日期选择器
-    if (showDatePicker) {
-        DatePickerDialog(
-            onDismissRequest = { showDatePicker = false },
-            confirmButton = {
-                TextButton(onClick = {
-                    datePickerState.selectedDateMillis?.let {
-                        deadlineDate = Date(it)
-                    }
-                    showDatePicker = false
-                }) {
-                    Text("确定")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showDatePicker = false }) {
-                    Text("取消")
-                }
-            },
-        ) {
-            DatePicker(state = datePickerState)
         }
     }
 }

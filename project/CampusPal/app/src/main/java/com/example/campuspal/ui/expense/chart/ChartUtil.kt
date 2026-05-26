@@ -60,3 +60,34 @@ fun weekDayLabel(dayOffset: Int): String = when (dayOffset) {
     0 -> "周一"; 1 -> "周二"; 2 -> "周三"; 3 -> "周四"; 4 -> "周五"; 5 -> "周六"; 6 -> "周日"
     else -> ""
 }
+
+fun getWeekDayLabels(today: Long): List<String> {
+    val todayCal = Calendar.getInstance().apply { timeInMillis = today }
+    val todayDay = todayCal.get(Calendar.DAY_OF_WEEK)
+    val todayOffset = when (todayDay) {
+        Calendar.MONDAY -> 0; Calendar.TUESDAY -> 1; Calendar.WEDNESDAY -> 2
+        Calendar.THURSDAY -> 3; Calendar.FRIDAY -> 4; Calendar.SATURDAY -> 5
+        Calendar.SUNDAY -> 6; else -> 0
+    }
+    return listOf("周一", "周二", "周三", "周四", "周五", "周六", "日").subList(0, todayOffset + 1)
+}
+
+fun getDayLabels(startMs: Long, endMs: Long): List<String> {
+    val startCal = Calendar.getInstance().apply { timeInMillis = startMs }
+    val endCal = Calendar.getInstance().apply { timeInMillis = endMs }
+    val startDay = startCal.get(Calendar.DAY_OF_MONTH)
+    val endDay = endCal.get(Calendar.DAY_OF_MONTH)
+    return (startDay..endDay).map { "$it" }
+}
+
+fun getMonthLabelsInRange(startMs: Long, endMs: Long): List<String> {
+    val labels = mutableListOf<String>()
+    val cal = Calendar.getInstance().apply { timeInMillis = startMs }
+    val endCal = Calendar.getInstance().apply { timeInMillis = endMs }
+    while (cal.get(Calendar.YEAR) < endCal.get(Calendar.YEAR) ||
+        (cal.get(Calendar.YEAR) == endCal.get(Calendar.YEAR) && cal.get(Calendar.MONTH) <= endCal.get(Calendar.MONTH))) {
+        labels.add("${cal.get(Calendar.MONTH) + 1}月")
+        cal.add(Calendar.MONTH, 1)
+    }
+    return labels
+}

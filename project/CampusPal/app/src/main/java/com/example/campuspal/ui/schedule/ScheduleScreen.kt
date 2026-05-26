@@ -23,7 +23,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.campuspal.data.db.entity.Course
-import com.example.campuspal.ui.theme.CourseColors
 import com.example.campuspal.ui.components.AppDimens
 import java.util.*
 
@@ -97,11 +96,10 @@ fun ScheduleScreen(viewModel: ScheduleViewModel) {
         )
     }
 
-    // 添加课程对话框
+    // 添加/编辑课程底部表单
     if (uiState.showAddDialog) {
-        val allCourses by viewModel.getAllCourses().collectAsState(initial = emptyList())
-        AddCourseDialog(
-            existingCourses = allCourses,
+        CourseForm(
+            editingCourse = null,
             onDismiss = { viewModel.hideAddDialog() },
             onSave = { viewModel.addCourse(it) },
         )
@@ -402,173 +400,4 @@ fun DetailRow(label: String, value: String) {
             )
         }
     }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun AddCourseDialog(
-    existingCourses: List<Course>,
-    onDismiss: () -> Unit,
-    onSave: (Course) -> Unit,
-) {
-    var name by remember { mutableStateOf("") }
-    var teacher by remember { mutableStateOf("") }
-    var location by remember { mutableStateOf("") }
-    var dayOfWeek by remember { mutableStateOf(1) }
-    var startTime by remember { mutableStateOf("08:00") }
-    var endTime by remember { mutableStateOf("08:50") }
-    var startWeek by remember { mutableStateOf("1") }
-    var endWeek by remember { mutableStateOf("16") }
-    var weekType by remember { mutableStateOf("every") }
-    var selectedColorIndex by remember { mutableStateOf(0) }
-    var showOverlapWarning by remember { mutableStateOf(false) }
-    var timeError by remember { mutableStateOf<String?>(null) }
-
-    val weekTypeOptions = listOf("every" to "每周", "odd" to "单周", "even" to "双周")
-
-    fun validate(): Boolean {
-        val trimmed = name.trim()
-        if (trimmed.isEmpty()) return false
-        name = trimmed
-        teacher = teacher.trim()
-        location = location.trim()
-
-        val sMin = timeToMinutes(startTime.trim())
-        val eMin = timeToMinutes(endTime.trim())
-        if (eMin <= sMin) {
-            timeError = "结束时间必须晚于开始时间"
-            return false
-        }
-        timeError = null
-        return true
-    }
-
-    fun checkOverlap(): Boolean {
-        val sMin = timeToMinutes(startTime.trim())
-        val eMin = timeToMinutes(endTime.trim())
-        val sWeek = startWeek.trim().toIntOrNull() ?: 1
-        val eWeek = endWeek.trim().toIntOrNull() ?: 16
-
-        return existingCourses.any { course ->
-            course.dayOfWeek == dayOfWeek && course.id != 0L &&
-            // 检查周次是否重叠
-            course.startWeek <= eWeek && course.endWeek >= sWeek &&
-            // 检查周类型是否冲突
-            (weekType == "every" || course.weekType == "every" || weekType == course.weekType) &&
-            // 检查时间段是否重叠
-            timeToMinutes(course.startTime) < eMin &&
-            timeToMinutes(course.endTime) > sMin
-        }
-    }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("添加课程") },
-        text = {
-            Column(
-                modifier = Modifier
-                    .heightIn(max = 450.dp)
-                    .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                OutlinedTextField(
-                    value = name,
-                    onValueChange = { name = it },
-                    label = { Text("课程名称 *") },
-                    singleLine = true,
-                    isError = name.trim().isEmpty() && name.isNotEmpty(),
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                OutlinedTextField(value = teacher, onValueChange = { teacher = it }, label = { Text("教师") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(value = location, onValueChange = { location = it }, label = { Text("地点") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-
-                // 星期选择
-                Text("上课日", style = MaterialTheme.typography.labelLarge)
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    dayLabels.forEachIndexed { index, label ->
-                        FilterChip(selected = dayOfWeek == index + 1, onClick = { dayOfWeek = index + 1 }, label = { Text(label, fontSize = 12.sp) })
-                    }
-                }
-
-                // 时间
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(
-                        value = startTime, onValueChange = { startTime = it },
-                        label = { Text("开始") }, singleLine = true, modifier = Modifier.weight(1f),
-                        isError = timeError != null, placeholder = { Text("HH:mm") },
-                    )
-                    OutlinedTextField(
-                        value = endTime, onValueChange = { endTime = it },
-                        label = { Text("结束") }, singleLine = true, modifier = Modifier.weight(1f),
-                        isError = timeError != null, placeholder = { Text("HH:mm") },
-                    )
-                }
-                if (timeError != null) {
-                    Text(timeError!!, color = MaterialTheme.colorScheme.error, fontSize = 12.sp)
-                }
-
-                // 周次
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(value = startWeek, onValueChange = { startWeek = it }, label = { Text("开始周") }, singleLine = true, modifier = Modifier.weight(1f))
-                    OutlinedTextField(value = endWeek, onValueChange = { endWeek = it }, label = { Text("结束周") }, singleLine = true, modifier = Modifier.weight(1f))
-                }
-
-                // 周类型
-                Text("周类型", style = MaterialTheme.typography.labelLarge)
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    weekTypeOptions.forEach { (value, label) ->
-                        FilterChip(selected = weekType == value, onClick = { weekType = value }, label = { Text(label) })
-                    }
-                }
-
-                // 颜色选择
-                Text("颜色", style = MaterialTheme.typography.labelLarge)
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    CourseColors.forEachIndexed { index, color ->
-                        Box(
-                            modifier = Modifier.size(32.dp).clip(RoundedCornerShape(16.dp)).background(color)
-                                .border(if (index == selectedColorIndex) 3.dp else 0.dp, Color.White, RoundedCornerShape(16.dp))
-                                .border(if (index == selectedColorIndex) 2.dp else 0.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(16.dp))
-                                .clickable { selectedColorIndex = index },
-                        )
-                    }
-                }
-
-                // 重叠警告
-                if (showOverlapWarning) {
-                    Surface(
-                        shape = RoundedCornerShape(8.dp),
-                        color = MaterialTheme.colorScheme.errorContainer,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Filled.Warning, contentDescription = null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(20.dp))
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("与已有课程时间段重叠，是否继续添加？", color = MaterialTheme.colorScheme.onErrorContainer, fontSize = 12.sp)
-                        }
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(
-                onClick = {
-                    if (!validate()) return@TextButton
-                    if (!showOverlapWarning && checkOverlap()) {
-                        showOverlapWarning = true
-                        return@TextButton
-                    }
-                    onSave(
-                        Course(
-                            name = name.trim(), teacher = teacher.trim(), location = location.trim(),
-                            dayOfWeek = dayOfWeek, startTime = startTime.trim(), endTime = endTime.trim(),
-                            startWeek = startWeek.trim().toIntOrNull() ?: 1, endWeek = endWeek.trim().toIntOrNull() ?: 16,
-                            weekType = weekType, color = CourseColors[selectedColorIndex].hashCode(),
-                        )
-                    )
-                },
-            ) { Text("保存") }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } },
-    )
 }

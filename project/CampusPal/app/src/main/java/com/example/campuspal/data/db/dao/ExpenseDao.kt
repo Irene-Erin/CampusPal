@@ -37,6 +37,9 @@ interface ExpenseDao {
     @Query("SELECT category, SUM(amount) as total FROM expenses WHERE type = 'expense' AND timestamp BETWEEN :start AND :end GROUP BY category ORDER BY total DESC")
     fun getCategorySumBetween(start: Long, end: Long): Flow<List<CategorySum>>
 
+    @Query("SELECT category, SUM(amount) as total FROM expenses WHERE type = 'expense' AND timestamp BETWEEN :start AND :end GROUP BY category ORDER BY total DESC")
+    suspend fun getCategorySumBetweenOnce(start: Long, end: Long): List<CategorySum>
+
     @Query("SELECT * FROM expenses WHERE id = :id")
     suspend fun getExpenseById(id: Long): Expense?
 
@@ -60,7 +63,34 @@ interface ExpenseDao {
     // 图表查询 — 按月汇总支出
     @Query("SELECT SUM(amount) as total FROM expenses WHERE type='expense' AND timestamp BETWEEN :start AND :end GROUP BY strftime('%Y-%m', timestamp/1000, 'unixepoch') ORDER BY strftime('%Y-%m', timestamp/1000, 'unixepoch')")
     suspend fun getMonthlySumsBetween(start: Long, end: Long): List<Double>
+
+    // 图表查询 — 按小时汇总支出
+    @Query("SELECT strftime('%H', timestamp/1000, 'unixepoch') as hour, SUM(amount) as total FROM expenses WHERE type='expense' AND timestamp BETWEEN :dayStart AND :dayEnd GROUP BY hour ORDER BY hour")
+    suspend fun getHourlySumByDay(dayStart: Long, dayEnd: Long): List<HourlySum>
+
+    // 图表查询 — 按天汇总支出（结构化结果）
+    @Query("SELECT strftime('%Y-%m-%d', timestamp/1000, 'unixepoch') as date, SUM(amount) as total FROM expenses WHERE type='expense' AND timestamp BETWEEN :start AND :end GROUP BY date ORDER BY date")
+    suspend fun getDailySumBetweenStructured(start: Long, end: Long): List<DailySumResult>
+
+    // 图表查询 — 按月汇总支出（结构化结果）
+    @Query("SELECT strftime('%Y-%m', timestamp/1000, 'unixepoch') as month, SUM(amount) as total FROM expenses WHERE type='expense' AND timestamp BETWEEN :start AND :end GROUP BY month ORDER BY month")
+    suspend fun getMonthlySumBetweenStructured(start: Long, end: Long): List<MonthlySumResult>
 }
+
+data class HourlySum(
+    val hour: String,
+    val total: Double,
+)
+
+data class DailySumResult(
+    val date: String,
+    val total: Double,
+)
+
+data class MonthlySumResult(
+    val month: String,
+    val total: Double,
+)
 
 data class CategorySum(
     val category: String,

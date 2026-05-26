@@ -41,6 +41,7 @@ data class ExpenseUiState(
     val showSemesterHint: Boolean = false,
     val yearTotalExpense: Double = 0.0,
     val yearTotalIncome: Double = 0.0,
+    val viewChartData: ViewChartData = ViewChartData(),
 )
 
 class ExpenseViewModel(
@@ -239,6 +240,119 @@ class ExpenseViewModel(
             }
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), ExpenseChartData())
 
+    private val viewChartDataFlow: StateFlow<ViewChartData> = combine(_currentView, _selectedDate, semesterRange) { v, d, (ss, se) -> Triple(v, d, ss to se) }
+        .flatMapLatest { (view, date, semRange) ->
+            flow {
+                val today = getTodayMidnight()
+                val todayEnd = endOfDay(today)
+                val catColors = mapOf(
+                    "饮食" to 0xFFFF6B6BL,
+                    "交通" to 0xFF4ECDC4L,
+                    "购物" to 0xFFFFB347L,
+                    "娱乐" to 0xFF9B59B6L,
+                    "学习" to 0xFF4A90D9L,
+                    "其他" to 0xFF95A5A6L,
+                )
+
+                fun catSlice(cat: String, total: Double): ChartPieSlice {
+                    val name = expenseCategories.firstOrNull { it.name == cat }?.name ?: cat
+                    return ChartPieSlice(name, total, catColors[cat] ?: 0xFF95A5A6L)
+                }
+
+                when (view) {
+                    ExpenseView.DAY -> {
+                        val dayStart = startOfDay(date); val dayEnd = endOfDay(date)
+                        val hourly = withContext(Dispatchers.IO) { expenseDao.getHourlySumByDay(dayStart, dayEnd) }
+                        val lineData = if (hourly.size >= 3) {
+                            val labels = (0..23).map { "${it}时" }
+                            val values = DoubleArray(24) { 0.0 }
+                            hourly.forEach { h -> values[h.hour.toIntOrNull() ?: 0] = h.total }
+                            LineChartData("今日支出趋势", labels.toList(), values.toList(), -1)
+                        } else null
+                        val cats = withContext(Dispatchers.IO) { expenseDao.getCategorySumByDay(dayStart, dayEnd) }
+                        val total = cats.sumOf { it.total }
+                        val pieData = if (total > 0) PieChartData("今日占比", "今日总支出", total, cats.map { catSlice(it.category, it.total) }) else null
+                        emit(ViewChartData(lineData, pieData))
+                    }
+                    ExpenseView.WEEK -> {
+                        val (ws, we) = getWeekRange(today)
+                        val dailyResults = withContext(Dispatchers.IO) { expenseDao.getDailySumBetweenStructured(ws, we) }
+                        val dailyMap = dailyResults.associate { it.date to it.total }
+                        val weekLabels = getWeekDayLabels(today)
+                        val weekValues = weekLabels.indices.map { i ->
+                            val cal = Calendar.getInstance().apply { timeInMillis = ws; add(Calendar.DAY_OF_MONTH, i) }
+                            val dateKey = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date(cal.timeInMillis))
+                            dailyMap[dateKey] ?: 0.0
+                        }
+                        val hlIdx = weekLabels.size - 1
+                        val lineData = LineChartData("本周趋势", weekLabels, weekValues, hlIdx)
+                        val cats = withContext(Dispatchers.IO) { expenseDao.getCategorySumBetweenOnce(ws, we) }
+                        val total = cats.sumOf { it.total }
+                        val pieData = if (total > 0) PieChartData("本周占比", "本周总支出", total, cats.map { catSlice(it.category, it.total) }) else null
+                        emit(ViewChartData(lineData, pieData))
+                    }
+                    ExpenseView.MONTH -> {
+                        val (ms, me) = getMonthRange(today)
+                        val dailyResults = withContext(Dispatchers.IO) { expenseDao.getDailySumBetweenStructured(ms, me) }
+                        val dailyMap = dailyResults.associate { it.date to it.total }
+                        val todayDom = Calendar.getInstance().get(Calendar.DAY_OF_MONTH)
+                        val labels = (1..todayDom).map { "$it" }
+                        val values = (1..todayDom).map { d ->
+                            val cal = Calendar.getInstance().apply { timeInMillis = ms; set(Calendar.DAY_OF_MONTH, d) }
+                            val dateKey = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date(cal.timeInMillis))
+                            dailyMap[dateKey] ?: 0.0
+                        }
+                        val hlIdx = todayDom - 1
+                        val lineData = LineChartData("本月趋势", labels, values, hlIdx)
+                        val cats = withContext(Dispatchers.IO) { expenseDao.getCategorySumBetweenOnce(ms, me) }
+                        val total = cats.sumOf { it.total }
+                        val pieData = if (total > 0) PieChartData("本月占比", "本月总支出", total, cats.map { catSlice(it.category, it.total) }) else null
+                        emit(ViewChartData(lineData, pieData))
+                    }
+                    ExpenseView.SEMESTER -> {
+                        val (semStart, semEnd) = semRange
+                        if (semStart <= 0L) {
+                            emit(ViewChartData())
+                        } else {
+                            val end = if (semEnd > today) today else semEnd
+                            val monthlyResults = withContext(Dispatchers.IO) { expenseDao.getMonthlySumBetweenStructured(semStart, endOfDay(end)) }
+                            val monthlyMap = monthlyResults.associate { it.month to it.total }
+                            val labels = getMonthLabelsInRange(semStart, end)
+                            val values = labels.mapIndexed { i, label ->
+                                val monthNum = label.replace("月", "").toIntOrNull() ?: (i + 1)
+                                val yearMonth = "%04d-%02d".format(Calendar.getInstance().apply { timeInMillis = end }.get(Calendar.YEAR), monthNum)
+                                monthlyMap[yearMonth] ?: 0.0
+                            }
+                            val curMonthLabel = monthLabel(today)
+                            val hlIdx = labels.indexOf(curMonthLabel)
+                            val lineData = LineChartData("学期趋势", labels, values, hlIdx)
+                            val cats = withContext(Dispatchers.IO) { expenseDao.getCategorySumBetweenOnce(semStart, endOfDay(end)) }
+                            val total = cats.sumOf { it.total }
+                            val pieData = if (total > 0) PieChartData("学期占比", "学期总支出", total, cats.map { catSlice(it.category, it.total) }) else null
+                            emit(ViewChartData(lineData, pieData))
+                        }
+                    }
+                    ExpenseView.YEAR -> {
+                        val (ys, ye) = getYearRange(today)
+                        val monthlyResults = withContext(Dispatchers.IO) { expenseDao.getMonthlySumBetweenStructured(ys, ye) }
+                        val monthlyMap = monthlyResults.associate { it.month to it.total }
+                        val curMonth = Calendar.getInstance().get(Calendar.MONTH)
+                        val labels = (0..curMonth).map { "${it + 1}月" }
+                        val values = (0..curMonth).map { m ->
+                            val yearMonth = "%04d-%02d".format(Calendar.getInstance().get(Calendar.YEAR), m + 1)
+                            monthlyMap[yearMonth] ?: 0.0
+                        }
+                        val hlIdx = curMonth
+                        val lineData = LineChartData("年度趋势", labels, values, hlIdx)
+                        val cats = withContext(Dispatchers.IO) { expenseDao.getCategorySumBetweenOnce(ys, ye) }
+                        val total = cats.sumOf { it.total }
+                        val pieData = if (total > 0) PieChartData("年度占比", "本年总支出", total, cats.map { catSlice(it.category, it.total) }) else null
+                        emit(ViewChartData(lineData, pieData))
+                    }
+                }
+            }
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), ViewChartData())
+
     @Suppress("UNCHECKED_CAST")
     val uiState: StateFlow<ExpenseUiState> = combine(
         rangeData, rangeIncome, settingsDataStore.monthlyBudget, _currentView, _isRefreshing,
@@ -250,7 +364,8 @@ class ExpenseViewModel(
         .combine(monthBreakdowns) { acc, bds -> acc.apply { add(bds) } }
         .combine(semesterCats) { acc, semC -> acc.apply { add(semC) } }
         .combine(_editingExpense) { acc, edit -> acc.apply { add(edit) } }
-        .combine(chartData) { acc, cd ->
+        .combine(chartData) { acc, cd -> acc to cd }
+        .combine(viewChartDataFlow) { (acc, cd), vcd ->
             val data = acc[0] as Triple<List<Expense>, List<CategorySum>, Double?>
             val income = acc[1] as Double?
             val budget = acc[2] as Double
@@ -276,6 +391,7 @@ class ExpenseViewModel(
                 linePoints = cd.linePoints, chartSubtitle = cd.chartSubtitle,
                 showSemesterHint = cd.showSemesterHint,
                 yearTotalExpense = cd.yearTotalExpense, yearTotalIncome = cd.yearTotalIncome,
+                viewChartData = vcd,
             )
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), ExpenseUiState())
 

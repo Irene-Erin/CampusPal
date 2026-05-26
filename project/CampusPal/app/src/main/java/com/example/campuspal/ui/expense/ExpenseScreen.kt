@@ -17,6 +17,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
@@ -27,7 +28,10 @@ import com.example.campuspal.data.db.dao.CategorySum
 import com.example.campuspal.data.db.entity.Expense
 import com.example.campuspal.ui.components.AppDimens
 import com.example.campuspal.ui.components.EmptyState
-import com.example.campuspal.ui.expense.chart.*
+import androidx.compose.ui.viewinterop.AndroidView
+import com.example.campuspal.ui.expense.chart.PieChartView
+import com.example.campuspal.ui.expense.chart.LineChartView
+import com.example.campuspal.ui.expense.ExpenseForm
 import com.example.campuspal.ui.theme.*
 import kotlinx.coroutines.delay
 import com.google.accompanist.swiperefresh.SwipeRefresh
@@ -106,7 +110,7 @@ fun ExpenseScreen(viewModel: ExpenseViewModel) {
     }
 
     if (showAddSheet) {
-        AddExpenseSheet(
+        ExpenseForm(
             editingExpense = uiState.editingExpense,
             onDismiss = { viewModel.hideAddSheet() },
             onSave = { viewModel.addExpense(it); showSuccess = true },
@@ -201,9 +205,9 @@ fun DailyContent(state: ExpenseUiState, viewModel: ExpenseViewModel) {
             }
         }
 
-        // 日视图饼图
-        if (state.pieSlices.isNotEmpty()) {
-            item { PieChartCard(slices = state.pieSlices) }
+        // 日视图图表
+        if (state.viewChartData.lineData != null || state.viewChartData.pieData != null) {
+            item { ChartSection(state.viewChartData) }
         }
 
         if (state.expenses.isEmpty()) {
@@ -247,14 +251,9 @@ fun WeekContent(state: ExpenseUiState, viewModel: ExpenseViewModel) {
             }
         }
 
-        // 周视图柱状图
-        if (state.barEntries.isNotEmpty()) {
-            item { BarChartCard(title = "本周每日支出", bars = state.barEntries) }
-        }
-
-        // 分类饼图
-        if (state.categorySums.isNotEmpty()) {
-            item { PieChartCard(slices = state.categorySums.map { s -> PieSlice(categoryMap[s.category]?.name ?: s.category, s.total, (categoryMap[s.category]?.color ?: Color.Gray).value.toLong()) }) }
+        // 周视图图表
+        if (state.viewChartData.lineData != null || state.viewChartData.pieData != null) {
+            item { ChartSection(state.viewChartData) }
         }
 
         if (state.expenses.isEmpty()) {
@@ -298,14 +297,9 @@ fun MonthContent(state: ExpenseUiState, viewModel: ExpenseViewModel) {
             }
         }
 
-        // 月视图折线图
-        if (state.linePoints.isNotEmpty()) {
-            item { LineChartCard(title = "本月支出趋势", subtitle = state.chartSubtitle, points = state.linePoints) }
-        }
-
-        // 分类饼图
-        if (state.categorySums.isNotEmpty()) {
-            item { PieChartCard(slices = state.categorySums.map { s -> PieSlice(categoryMap[s.category]?.name ?: s.category, s.total, (categoryMap[s.category]?.color ?: Color.Gray).value.toLong()) }) }
+        // 月视图图表
+        if (state.viewChartData.lineData != null || state.viewChartData.pieData != null) {
+            item { ChartSection(state.viewChartData) }
         }
 
         if (state.expenses.isEmpty()) {
@@ -359,21 +353,9 @@ fun SemesterContent(state: ExpenseUiState, viewModel: ExpenseViewModel) {
                 }
             }
         } else {
-            // 学期月度柱状图
-            if (state.barEntries.isNotEmpty()) {
-                item {
-                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        if (state.chartSubtitle.isNotBlank()) {
-                            Text(state.chartSubtitle, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 4.dp))
-                        }
-                        BarChartCard(title = "月度支出对比", bars = state.barEntries)
-                    }
-                }
-            }
-
-            // 学期分类饼图
-            if (state.semesterCategorySums.isNotEmpty()) {
-                item { PieChartCard(slices = state.semesterCategorySums.map { s -> PieSlice(categoryMap[s.category]?.name ?: s.category, s.total, (categoryMap[s.category]?.color ?: Color.Gray).value.toLong()) }, totalLabel = "学期总支出") }
+            // 学期视图图表
+            if (state.viewChartData.lineData != null || state.viewChartData.pieData != null) {
+                item { ChartSection(state.viewChartData) }
             }
 
             if (state.semesterCategorySums.isNotEmpty()) {
@@ -421,16 +403,9 @@ fun YearContent(state: ExpenseUiState, viewModel: ExpenseViewModel) {
             }
         }
 
-        // 年视图月度柱状图
-        if (state.barEntries.isNotEmpty()) {
-            item {
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    if (state.chartSubtitle.isNotBlank()) {
-                        Text(state.chartSubtitle, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 4.dp))
-                    }
-                    BarChartCard(title = "月度支出对比", bars = state.barEntries)
-                }
-            }
+        // 年视图图表
+        if (state.viewChartData.lineData != null || state.viewChartData.pieData != null) {
+            item { ChartSection(state.viewChartData) }
         }
 
         if (state.expenses.isEmpty()) {
@@ -471,49 +446,51 @@ fun ExpenseItem(expense: Expense, onLongPress: () -> Unit, onClick: () -> Unit) 
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+// ========== 图表组件 ==========
 @Composable
-fun AddExpenseSheet(editingExpense: Expense? = null, onDismiss: () -> Unit, onSave: (Expense) -> Unit) {
-    var amount by remember(editingExpense) { mutableStateOf(editingExpense?.amount?.toString() ?: "") }
-    var selectedType by remember(editingExpense) { mutableStateOf(editingExpense?.type ?: "expense") }
-    var selectedCategory by remember(editingExpense) { mutableStateOf(editingExpense?.category ?: expenseCategories[0].name) }
-    var note by remember(editingExpense) { mutableStateOf(editingExpense?.note ?: "") }
-    val isEditing = editingExpense != null
+fun ChartSection(data: com.example.campuspal.ui.expense.chart.ViewChartData) {
+    val lineColor = MaterialTheme.colorScheme.primary.toArgb()
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(if (isEditing) "编辑记录" else "快速记账") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-                    TabRow(selectedTabIndex = if (selectedType == "expense") 0 else 1, modifier = Modifier.width(200.dp)) {
-                        Tab(selected = selectedType == "expense", onClick = { selectedType = "expense" }) { Text("支出", modifier = Modifier.padding(12.dp)) }
-                        Tab(selected = selectedType == "income", onClick = { selectedType = "income" }) { Text("收入", modifier = Modifier.padding(12.dp)) }
-                    }
-                }
-                OutlinedTextField(amount, { amount = it }, label = { Text("金额") }, singleLine = true, modifier = Modifier.fillMaxWidth(), leadingIcon = { Text("¥") })
-                Text("分类", style = MaterialTheme.typography.labelLarge)
-                Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    expenseCategories.forEach { cat ->
-                        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable { selectedCategory = cat.name }.background(if (selectedCategory == cat.name) cat.color.copy(alpha = 0.15f) else Color.Transparent).padding(8.dp)) {
-                            Icon(cat.icon, cat.name, tint = cat.color, modifier = Modifier.size(22.dp)); Text(cat.name, fontSize = 11.sp)
-                        }
-                    }
-                }
-                OutlinedTextField(note, { note = it }, label = { Text("备注") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+    // 折线图
+    data.lineData?.let { ld ->
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        ) {
+            Column(Modifier.padding(16.dp)) {
+                Text(ld.title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                Spacer(Modifier.height(4.dp))
+                AndroidView(
+                    factory = { LineChartView(it) },
+                    modifier = Modifier.fillMaxWidth().height(200.dp),
+                ) { view -> view.setData(ld.title, ld.labels, ld.values, lineColor) }
             }
-        },
-        confirmButton = {
-            TextButton(
-                onClick = {
-                    val amt = amount.toDoubleOrNull()
-                    if (amt != null && amt > 0) {
-                        onSave(Expense(id = editingExpense?.id ?: 0L, amount = amt, category = selectedCategory, note = note, type = selectedType, timestamp = editingExpense?.timestamp ?: System.currentTimeMillis()))
+        }
+        Spacer(Modifier.height(12.dp))
+    }
+
+    // 饼图
+    data.pieData?.let { pd ->
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        ) {
+            Column(Modifier.padding(16.dp)) {
+                Text(pd.title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                Spacer(Modifier.height(4.dp))
+                AndroidView(
+                    factory = { PieChartView(it) },
+                    modifier = Modifier.fillMaxWidth().height(200.dp),
+                ) { view ->
+                    val pieData = pd.slices.map { s ->
+                        PieChartView.PieSliceData(s.label, s.value, s.color.toInt())
                     }
-                },
-                enabled = (amount.toDoubleOrNull() ?: 0.0) > 0,
-            ) { Text("保存") }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } },
-    )
+                    view.setData(pieData)
+                }
+            }
+        }
+    }
 }
+
