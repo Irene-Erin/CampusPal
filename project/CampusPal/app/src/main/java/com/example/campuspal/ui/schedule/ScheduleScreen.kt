@@ -3,10 +3,8 @@ package com.example.campuspal.ui.schedule
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -17,6 +15,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -25,7 +24,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.campuspal.data.db.entity.Course
 import com.example.campuspal.ui.components.AppDimens
-import com.example.campuspal.ui.schedule.WeekCalculator
 import java.util.*
 
 // 时间段定义
@@ -58,36 +56,18 @@ fun ScheduleScreen(viewModel: ScheduleViewModel) {
             onJumpToToday = { viewModel.jumpToToday() },
         )
 
-        // 周视图网格 — 平板自适应
+        // 一体化课程表网格
         BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-            WeekGrid(
+            UnifiedWeekGrid(
                 currentWeek = uiState.currentWeek,
                 maxWidth = maxWidth,
                 viewModel = viewModel,
                 onCourseClick = { viewModel.showDetail(it) },
+                onEmptyCellClick = { day, slot ->
+                    viewModel.showAddDialog(day, slot)
+                },
             )
         }
-    }
-
-    // 悬浮按钮 — 大圆角设计
-    FloatingActionButton(
-        onClick = { viewModel.showAddDialog() },
-        modifier = Modifier
-            .padding(16.dp)
-            .navigationBarsPadding()
-            .size(60.dp),
-        containerColor = MaterialTheme.colorScheme.primary,
-        shape = RoundedCornerShape(18.dp),
-        elevation = FloatingActionButtonDefaults.elevation(
-            defaultElevation = 6.dp,
-            pressedElevation = 10.dp,
-        ),
-    ) {
-        Icon(
-            Icons.Filled.Add,
-            contentDescription = "添加课程",
-            modifier = Modifier.size(28.dp),
-        )
     }
 
     // 课程详情对话框
@@ -100,10 +80,12 @@ fun ScheduleScreen(viewModel: ScheduleViewModel) {
         )
     }
 
-    // 添加/编辑课程底部表单
+    // 添加课程（含预填星期/节次）
     if (uiState.showAddDialog) {
         CourseForm(
             editingCourse = null,
+            prefillDay = uiState.addDayOfWeek,
+            prefillStartSlot = uiState.addStartSlot,
             onDismiss = { viewModel.hideAddDialog() },
             onSave = { viewModel.addCourse(it) },
         )
@@ -190,107 +172,109 @@ fun WeekSelector(currentWeek: Int, onPrev: () -> Unit, onNext: () -> Unit, onJum
     }
 }
 
+/**
+ * 一体化课程表：表头 + 时间列 + 课程网格，统一滚动
+ */
 @Composable
-fun WeekGrid(
+fun UnifiedWeekGrid(
     currentWeek: Int,
     maxWidth: androidx.compose.ui.unit.Dp,
     viewModel: ScheduleViewModel,
     onCourseClick: (Course) -> Unit,
+    onEmptyCellClick: (dayOfWeek: Int, startSlot: Int) -> Unit,
 ) {
     val slotHeight = AppDimens.scheduleSlotHeight
     val timeWidth = AppDimens.scheduleTimeWidth
-    // 平板使用更宽的日列
     val isTablet = maxWidth > 840.dp
     val dayWidth = if (isTablet) AppDimens.scheduleDayWidthTablet else AppDimens.scheduleDayWidthPhone
+    val headerHeight = 40.dp
 
-    // 为每一天加载课程
-    val dayCoursesMap = remember(currentWeek) {
-        mutableStateMapOf<Int, List<Course>>()
-    }
-
+    // 加载每天的课程
+    val dayCoursesMap = remember(currentWeek) { mutableStateMapOf<Int, List<Course>>() }
     for (day in 1..7) {
         val courses by viewModel.getCoursesForDay(day).collectAsState(initial = emptyList())
         dayCoursesMap[day] = courses
     }
 
+    val todayIndex = WeekCalculator.getTodayDayOfWeek()
+    val totalGridWidth = timeWidth + dayWidth * 7
+
+    // 统一的水平+垂直滚动容器
+    val hScroll = rememberScrollState()
+
     Column(modifier = Modifier.fillMaxSize()) {
-        // 表头：星期 — 圆角设计
-        Row(modifier = Modifier.fillMaxWidth()) {
-            Spacer(modifier = Modifier.width(timeWidth))
-            val today = Calendar.getInstance().get(Calendar.DAY_OF_WEEK)
-            val todayIndex = when (today) {
-                Calendar.MONDAY -> 1
-                Calendar.TUESDAY -> 2
-                Calendar.WEDNESDAY -> 3
-                Calendar.THURSDAY -> 4
-                Calendar.FRIDAY -> 5
-                Calendar.SATURDAY -> 6
-                Calendar.SUNDAY -> 7
-                else -> -1
-            }
+        // —— 表头行（与网格列对齐）——
+        Row(
+            modifier = Modifier
+                .horizontalScroll(hScroll)
+                .width(totalGridWidth),
+        ) {
+            // 左上角空白（对齐时间列）
+            Box(modifier = Modifier.width(timeWidth).height(headerHeight))
+            // 星期标签
             dayLabels.forEachIndexed { index, day ->
                 val isToday = (index + 1) == todayIndex
                 Surface(
-                    modifier = Modifier
-                        .width(dayWidth)
-                        .height(40.dp),
-                    color = if (isToday)
-                        MaterialTheme.colorScheme.primary
-                    else
-                        MaterialTheme.colorScheme.primaryContainer,
-                    shape = RoundedCornerShape(topStart = if (index == 0) 10.dp else 0.dp, topEnd = if (index == 6) 10.dp else 0.dp),
+                    modifier = Modifier.width(dayWidth).height(headerHeight),
+                    color = if (isToday) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.primaryContainer,
+                    shape = RoundedCornerShape(
+                        topStart = if (index == 0) 10.dp else 0.dp,
+                        topEnd = if (index == 6) 10.dp else 0.dp,
+                    ),
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         Text(
                             text = day,
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = if (isToday) FontWeight.Bold else FontWeight.SemiBold,
-                            color = if (isToday)
-                                MaterialTheme.colorScheme.onPrimary
-                            else
-                                MaterialTheme.colorScheme.onPrimaryContainer,
+                            color = if (isToday) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onPrimaryContainer,
                         )
                     }
                 }
             }
         }
 
-        // 内容区域：时间列 + 课程网格
-        Row(modifier = Modifier.fillMaxSize()) {
-            // 时间列
-            LazyColumn(modifier = Modifier.width(timeWidth)) {
-                items(timeSlots) { slot ->
-                    Box(
-                        modifier = Modifier
-                            .width(timeWidth)
-                            .height(slotHeight)
-                            .border(0.5.dp, MaterialTheme.colorScheme.outlineVariant),
-                        contentAlignment = Alignment.TopEnd,
-                    ) {
-                        Text(
-                            text = slot.label,
-                            fontSize = 10.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(end = 4.dp, top = 2.dp),
-                        )
-                    }
-                }
-            }
-
-            // 每天列（可水平滚动）
-            val horizontalScrollState = rememberScrollState()
+        // —— 课程表主体（时间列 + 网格，统一滚动）——
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState()),
+        ) {
             Row(
                 modifier = Modifier
-                    .fillMaxSize()
-                    .horizontalScroll(horizontalScrollState),
+                    .horizontalScroll(hScroll)
+                    .width(totalGridWidth),
             ) {
+                // 左侧时间列
+                Column(modifier = Modifier.width(timeWidth)) {
+                    timeSlots.forEach { slot ->
+                        Box(
+                            modifier = Modifier
+                                .width(timeWidth)
+                                .height(slotHeight)
+                                .border(0.5.dp, MaterialTheme.colorScheme.outlineVariant),
+                            contentAlignment = Alignment.TopEnd,
+                        ) {
+                            Text(
+                                text = slot.label,
+                                fontSize = 10.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(end = 4.dp, top = 2.dp),
+                            )
+                        }
+                    }
+                }
+
+                // 右侧 7 天课程网格
                 for (day in 1..7) {
                     DayColumn(
                         day = day,
                         courses = dayCoursesMap[day] ?: emptyList(),
                         slotHeight = slotHeight,
                         dayWidth = dayWidth,
+                        todayIndex = todayIndex,
                         onCourseClick = onCourseClick,
+                        onEmptyCellClick = { slot -> onEmptyCellClick(day, slot) },
                     )
                 }
             }
@@ -298,27 +282,65 @@ fun WeekGrid(
     }
 }
 
+/**
+ * 单天列：网格 + 课程块 + 空白格点击
+ */
 @Composable
 fun DayColumn(
     day: Int,
     courses: List<Course>,
     slotHeight: androidx.compose.ui.unit.Dp,
     dayWidth: androidx.compose.ui.unit.Dp,
+    todayIndex: Int,
     onCourseClick: (Course) -> Unit,
+    onEmptyCellClick: (startSlot: Int) -> Unit,
 ) {
-    val slotHeightPx = with(androidx.compose.ui.platform.LocalDensity.current) { slotHeight.toPx() }
+    val slotHeightPx = with(LocalDensity.current) { slotHeight.toPx() }
     var pressedCourseId by remember { mutableStateOf<Long?>(null) }
 
+    // 记录每个时间段是否被课程占用
+    val occupiedSlots = remember(courses) {
+        BooleanArray(14) { slot ->
+            val slotStartMin = 8 * 60 + slot * 50
+            val slotEndMin = slotStartMin + 50
+            courses.any { course ->
+                val cs = timeToMinutes(course.startTime)
+                val ce = timeToMinutes(course.endTime)
+                cs < slotEndMin && ce > slotStartMin
+            }
+        }
+    }
+
     Box(modifier = Modifier.width(dayWidth)) {
-        // 背景网格
+        // 背景网格 + 空白格点击
         Column {
-            timeSlots.forEach { slot ->
+            timeSlots.forEachIndexed { slotIndex, _ ->
+                val isEmpty = !occupiedSlots.getOrElse(slotIndex) { false }
                 Box(
                     modifier = Modifier
                         .width(dayWidth)
                         .height(slotHeight)
-                        .border(0.5.dp, MaterialTheme.colorScheme.outlineVariant),
-                )
+                        .border(0.5.dp, MaterialTheme.colorScheme.outlineVariant)
+                        .then(
+                            if (isEmpty) {
+                                Modifier.clickable { onEmptyCellClick(slotIndex) }
+                            } else {
+                                Modifier
+                            }
+                        ),
+                ) {
+                    // 空白格显示 "+" 提示
+                    if (isEmpty) {
+                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            Text(
+                                "+",
+                                fontSize = 16.sp,
+                                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f),
+                                fontWeight = FontWeight.Light,
+                            )
+                        }
+                    }
+                }
             }
         }
 
@@ -337,10 +359,10 @@ fun DayColumn(
 
             Box(
                 modifier = Modifier
-                    .offset(y = with(androidx.compose.ui.platform.LocalDensity.current) { (offsetPx / slotHeightPx * slotHeight.toPx()).toDp() })
+                    .offset(y = with(LocalDensity.current) { offsetPx.toDp() })
                     .padding(horizontal = 2.dp)
                     .width(dayWidth - 4.dp)
-                    .height(with(androidx.compose.ui.platform.LocalDensity.current) { heightPx.toDp() })
+                    .height(with(LocalDensity.current) { heightPx.toDp() })
                     .clip(RoundedCornerShape(8.dp))
                     .background(Color(course.color))
                     .graphicsLayer { scaleX = scale; scaleY = scale }
@@ -373,16 +395,15 @@ fun DayColumn(
         }
 
         // 当前时间指示线（仅当天显示）
-        val today = WeekCalculator.getTodayDayOfWeek()
-        if (day == today) {
+        if (day == todayIndex) {
             val now = Calendar.getInstance()
             val nowMinutes = now.get(Calendar.HOUR_OF_DAY) * 60 + now.get(Calendar.MINUTE)
             val baseMin = 8 * 60
             if (nowMinutes in baseMin..(21 * 60)) {
-                val offsetPx = ((nowMinutes - baseMin).toFloat() / 50f) * slotHeightPx
+                val lineOffsetPx = ((nowMinutes - baseMin).toFloat() / 50f) * slotHeightPx
                 Box(
                     modifier = Modifier
-                        .offset(y = with(LocalDensity.current) { offsetPx.toDp() })
+                        .offset(y = with(LocalDensity.current) { lineOffsetPx.toDp() })
                         .fillMaxWidth()
                         .height(2.dp)
                         .background(MaterialTheme.colorScheme.error),

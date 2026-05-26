@@ -33,6 +33,8 @@ val WeekTypeLabels = listOf("every" to "每周", "odd" to "单周", "even" to "�
 @Composable
 fun CourseForm(
     editingCourse: Course? = null,
+    prefillDay: Int? = null,
+    prefillStartSlot: Int? = null,
     onSave: (Course) -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -40,9 +42,23 @@ fun CourseForm(
     var name by remember(editingCourse) { mutableStateOf(editingCourse?.name ?: "") }
     var teacher by remember(editingCourse) { mutableStateOf(editingCourse?.teacher ?: "") }
     var location by remember(editingCourse) { mutableStateOf(editingCourse?.location ?: "") }
-    var selectedDay by remember(editingCourse) { mutableIntStateOf(editingCourse?.dayOfWeek ?: 1) }
-    var startTime by remember(editingCourse) { mutableStateOf(editingCourse?.startTime ?: "08:00") }
-    var endTime by remember(editingCourse) { mutableStateOf(editingCourse?.endTime ?: "09:40") }
+    var selectedDay by remember(editingCourse, prefillDay) {
+        mutableIntStateOf(editingCourse?.dayOfWeek ?: prefillDay ?: 1)
+    }
+
+    // 根据预填节次推算时间
+    val prefillStartTime = prefillStartSlot?.let { ScheduleConstants.getSectionTime(it)?.startTime }
+    val prefillEndTime = prefillStartSlot?.let {
+        // 结束节次默认为开始节次+1
+        ScheduleConstants.getSectionTime(it + 1)?.endTime ?: ScheduleConstants.getSectionTime(it)?.endTime
+    }
+
+    var startTime by remember(editingCourse, prefillStartSlot) {
+        mutableStateOf(editingCourse?.startTime ?: prefillStartTime ?: "08:00")
+    }
+    var endTime by remember(editingCourse, prefillStartSlot) {
+        mutableStateOf(editingCourse?.endTime ?: prefillEndTime ?: "09:40")
+    }
     var startWeek by remember(editingCourse) { mutableIntStateOf(editingCourse?.startWeek ?: 1) }
     var endWeek by remember(editingCourse) { mutableIntStateOf(editingCourse?.endWeek ?: 16) }
     var weekType by remember(editingCourse) { mutableStateOf(editingCourse?.weekType ?: "every") }

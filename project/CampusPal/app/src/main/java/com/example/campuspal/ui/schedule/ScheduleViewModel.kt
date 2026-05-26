@@ -18,6 +18,8 @@ data class ScheduleUiState(
     val editingCourse: Course? = null,
     val conflictWarning: String? = null,
     val pendingCourse: Course? = null,
+    val addDayOfWeek: Int? = null,
+    val addStartSlot: Int? = null,
     val isLoading: Boolean = false,
 )
 
@@ -33,6 +35,8 @@ class ScheduleViewModel(
     private val _editingCourse = MutableStateFlow<Course?>(null)
     private val _conflictWarning = MutableStateFlow<String?>(null)
     private val _pendingCourse = MutableStateFlow<Course?>(null)
+    private val _addDayOfWeek = MutableStateFlow<Int?>(null)
+    private val _addStartSlot = MutableStateFlow<Int?>(null)
     private val _isLoading = MutableStateFlow(false)
 
     // 真实当前周数
@@ -50,21 +54,30 @@ class ScheduleViewModel(
         _currentWeek,
         _selectedCourse,
         _showDetailDialog,
-        _showAddDialog,
-        _editingCourse,
-        _conflictWarning,
-        _isLoading,
-    ) { week, course, detail, add, editing, conflict, loading ->
+    ) { week, course, detail ->
+        mutableListOf<Any?>(week, course, detail)
+    }.combine(_showAddDialog) { list, add ->
+        list.apply { add(add) }
+    }.combine(_editingCourse) { list, editing ->
+        list.apply { add(editing) }
+    }.combine(_conflictWarning) { list, conflict ->
+        list.apply { add(conflict) }
+    }.combine(_isLoading) { list, loading ->
+        list.apply { add(loading) }
+    }.combine(_addDayOfWeek) { list, day ->
+        list.apply { add(day) }
+    }.combine(_addStartSlot) { list, slot ->
         ScheduleUiState(
-            courses = emptyList(),
-            currentWeek = week,
-            selectedCourse = course,
-            showDetailDialog = detail,
-            showAddDialog = add,
-            editingCourse = editing,
-            conflictWarning = conflict,
+            currentWeek = list[0] as Int,
+            selectedCourse = list[1] as Course?,
+            showDetailDialog = list[2] as Boolean,
+            showAddDialog = list[3] as Boolean,
+            editingCourse = list[4] as Course?,
+            conflictWarning = list[5] as String?,
             pendingCourse = _pendingCourse.value,
-            isLoading = loading,
+            isLoading = list[6] as Boolean,
+            addDayOfWeek = list[7] as Int?,
+            addStartSlot = slot,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), ScheduleUiState())
 
@@ -102,12 +115,16 @@ class ScheduleViewModel(
         _selectedCourse.value = null
     }
 
-    fun showAddDialog() {
+    fun showAddDialog(dayOfWeek: Int? = null, startSlot: Int? = null) {
         _showAddDialog.value = true
+        _addDayOfWeek.value = dayOfWeek?.let { if (it in 1..7) it else null }
+        _addStartSlot.value = startSlot?.let { if (it in 0..13) it else null }
     }
 
     fun hideAddDialog() {
         _showAddDialog.value = false
+        _addDayOfWeek.value = null
+        _addStartSlot.value = null
     }
 
     fun addCourse(course: Course) {
