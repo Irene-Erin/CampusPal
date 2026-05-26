@@ -366,17 +366,17 @@ class ExpenseViewModel(
         .combine(_editingExpense) { acc, edit -> acc.apply { add(edit) } }
         .combine(chartData) { acc, cd -> acc to cd }
         .combine(viewChartDataFlow) { (acc, cd), vcd ->
-            val data = acc[0] as Triple<List<Expense>, List<CategorySum>, Double?>
-            val income = acc[1] as Double?
-            val budget = acc[2] as Double
-            val view = acc[3] as ExpenseView
-            val refreshing = acc[4] as Boolean
-            val date = acc[5] as Long
-            val semStart = acc[6] as Long
-            val semEnd = acc[7] as Long
-            val bds = acc[8] as List<MonthlyBreakdown>
-            val semCats = acc[9] as List<CategorySum>
-            val editing = acc[10] as Expense?
+            val data = acc.getOrNull(0) as? Triple<List<Expense>, List<CategorySum>, Double?> ?: Triple(emptyList(), emptyList(), null)
+            val income = acc.getOrNull(1) as? Double?
+            val budget = acc.getOrNull(2) as? Double ?: 2000.0
+            val view = acc.getOrNull(3) as? ExpenseView ?: ExpenseView.MONTH
+            val refreshing = acc.getOrNull(4) as? Boolean ?: false
+            val date = acc.getOrNull(5) as? Long ?: System.currentTimeMillis()
+            val semStart = acc.getOrNull(6) as? Long ?: 0L
+            val semEnd = acc.getOrNull(7) as? Long ?: 0L
+            val bds = acc.getOrNull(8) as? List<MonthlyBreakdown> ?: emptyList()
+            val semCats = acc.getOrNull(9) as? List<CategorySum> ?: emptyList()
+            val editing = acc.getOrNull(10) as? Expense?
             val semTotalInc = if (view == ExpenseView.SEMESTER) income ?: 0.0 else 0.0
             ExpenseUiState(
                 expenses = data.first, categorySums = data.second,
