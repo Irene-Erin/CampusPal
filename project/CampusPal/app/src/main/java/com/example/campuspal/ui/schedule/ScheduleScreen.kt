@@ -47,6 +47,28 @@ val dayLabels = listOf("周一", "周二", "周三", "周四", "周五", "周六
 fun ScheduleScreen(viewModel: ScheduleViewModel) {
     val uiState by viewModel.uiState.collectAsState()
 
+    // 进入页面时重置所有弹窗状态，防止导航残留
+    LaunchedEffect(Unit) {
+        viewModel.hideAddDialog()
+        viewModel.hideDetail()
+        viewModel.hideEditDialog()
+        viewModel.clearConflict()
+    }
+
+    // 内部弹窗状态，避免导航切换后 BottomSheet 异常
+    var showAddForm by remember { mutableStateOf(false) }
+    var addFormDay by remember { mutableStateOf<Int?>(null) }
+    var addFormSlot by remember { mutableStateOf<Int?>(null) }
+
+    // 仅在刚触发时打开（true→true 不重复触发）
+    LaunchedEffect(uiState.showAddDialog) {
+        if (uiState.showAddDialog && !showAddForm) {
+            addFormDay = uiState.addDayOfWeek
+            addFormSlot = uiState.addStartSlot
+            showAddForm = true
+        }
+    }
+
     Column(modifier = Modifier.fillMaxSize()) {
         // 顶部周次选择器
         WeekSelector(
@@ -80,23 +102,45 @@ fun ScheduleScreen(viewModel: ScheduleViewModel) {
         )
     }
 
-    // 添加课程（含预填星期/节次）
-    if (uiState.showAddDialog) {
+    // 添加课程（含预填星期/节次）— 使用内部状态控制
+    if (showAddForm) {
         CourseForm(
             editingCourse = null,
-            prefillDay = uiState.addDayOfWeek,
-            prefillStartSlot = uiState.addStartSlot,
-            onDismiss = { viewModel.hideAddDialog() },
-            onSave = { viewModel.addCourse(it) },
+            prefillDay = addFormDay,
+            prefillStartSlot = addFormSlot,
+            onDismiss = {
+                showAddForm = false
+                viewModel.hideAddDialog()
+            },
+            onSave = {
+                viewModel.addCourse(it)
+                showAddForm = false
+            },
         )
     }
 
-    // 编辑课程
-    if (uiState.editingCourse != null) {
+    // 编辑课程 — 使用内部状态控制
+    var showEditForm by remember { mutableStateOf(false) }
+    var editFormCourse by remember { mutableStateOf<Course?>(null) }
+
+    LaunchedEffect(uiState.editingCourse) {
+        if (uiState.editingCourse != null && !showEditForm) {
+            editFormCourse = uiState.editingCourse
+            showEditForm = true
+        }
+    }
+
+    if (showEditForm && editFormCourse != null) {
         CourseForm(
-            editingCourse = uiState.editingCourse,
-            onDismiss = { viewModel.hideEditDialog() },
-            onSave = { viewModel.updateCourse(it) },
+            editingCourse = editFormCourse,
+            onDismiss = {
+                showEditForm = false
+                viewModel.hideEditDialog()
+            },
+            onSave = {
+                viewModel.updateCourse(it)
+                showEditForm = false
+            },
         )
     }
 
