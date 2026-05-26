@@ -21,6 +21,8 @@ data class SettingsUiState(
     val monthlyBudget: Double = 2000.0,
     val semesterStart: Long = 0L,
     val semesterEnd: Long = 0L,
+    val showWeekend: Boolean = true,
+    val showNonCurrentWeek: Boolean = false,
     val showBudgetDialog: Boolean = false,
     val showSemesterDialog: Boolean = false,
     val exportMessage: String? = null,
@@ -54,6 +56,10 @@ class SettingsViewModel(
     }.combine(_exportMessage) { list, export ->
         list.apply { add(export) }
     }.combine(_importMessage) { list, import ->
+        list.apply { add(import) }
+    }.combine(settingsDataStore.showWeekend) { list, showWk ->
+        list.apply { add(showWk) }
+    }.combine(settingsDataStore.showNonCurrentWeek) { list, showNon ->
         SettingsUiState(
             isDarkTheme = list[0] as Boolean,
             colorScheme = list[1] as String,
@@ -64,7 +70,9 @@ class SettingsViewModel(
             semesterStart = list[6] as Long,
             semesterEnd = list[7] as Long,
             exportMessage = list[8] as String?,
-            importMessage = import,
+            importMessage = list[9] as String?,
+            showWeekend = list[10] as Boolean,
+            showNonCurrentWeek = showNon,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), SettingsUiState())
 
@@ -101,6 +109,14 @@ class SettingsViewModel(
             settingsDataStore.setSemesterEnd(end)
             _showSemesterDialog.value = false
         }
+    }
+
+    fun setShowWeekend(show: Boolean) {
+        viewModelScope.launch { settingsDataStore.setShowWeekend(show) }
+    }
+
+    fun setShowNonCurrentWeek(show: Boolean) {
+        viewModelScope.launch { settingsDataStore.setShowNonCurrentWeek(show) }
     }
 
     fun clearMessages() {

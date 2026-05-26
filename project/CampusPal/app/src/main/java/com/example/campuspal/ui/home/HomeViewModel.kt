@@ -10,6 +10,7 @@ import com.example.campuspal.data.db.entity.Course
 import com.example.campuspal.data.db.entity.Expense
 import com.example.campuspal.data.db.entity.Task
 import com.example.campuspal.data.datastore.SettingsDataStore
+import com.example.campuspal.ui.schedule.WeekCalculator
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import java.util.*
@@ -37,32 +38,17 @@ class HomeViewModel(
 
     private val _isRefreshing = MutableStateFlow(false)
 
-    // 计算当前是第几周（简化：从学期开始算）
-    private val currentWeek: Int
-        get() {
-            // 假设学期从2024年2月26日开始，可根据实际情况调整
-            val semesterStart = Calendar.getInstance().apply {
-                set(2024, Calendar.FEBRUARY, 26)
-            }
-            val now = Calendar.getInstance()
-            val diff = now.get(Calendar.WEEK_OF_YEAR) - semesterStart.get(Calendar.WEEK_OF_YEAR) + 1
-            return diff.coerceIn(1, 20)
-        }
+    // 从 SettingsDataStore 获取学期开始日期，计算当前周数
+    private val currentWeekFlow: StateFlow<Int> = settingsDataStore.semesterStart.map { semesterStartMs ->
+        WeekCalculator.calculateCurrentWeek(semesterStartMs)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 1)
 
-    private val todayDayOfWeek: Int
-        get() {
-            val day = Calendar.getInstance().get(Calendar.DAY_OF_WEEK)
-            return when (day) {
-                Calendar.MONDAY -> 1
-                Calendar.TUESDAY -> 2
-                Calendar.WEDNESDAY -> 3
-                Calendar.THURSDAY -> 4
-                Calendar.FRIDAY -> 5
-                Calendar.SATURDAY -> 6
-                Calendar.SUNDAY -> 7
-                else -> 1
-            }
-        }
+    private val dayOfWeek = WeekCalculator.getTodayDayOfWeek()
+
+    // 根据当前周数动态获取今日课程
+    private val todayCourses: Flow<List<Course>> = currentWeekFlow.flatMapLatest { week ->
+        courseDao.getCoursesForDayAndWeek(dayOfWeek, week)
+    }
 
     private val todayStart: Long
         get() {
@@ -106,11 +92,8 @@ class HomeViewModel(
             return cal.timeInMillis
         }
 
-    private val week = currentWeek
-    private val dayOfWeek = todayDayOfWeek
-
     val uiState: StateFlow<HomeUiState> = combine(
-        courseDao.getCoursesForDayAndWeek(dayOfWeek, week),
+        todayCourses,
         taskDao.getUrgentTasks(Date()),
         expenseDao.getExpensesByMonth(todayStart, todayEnd),
         expenseDao.getTotalExpenseBetween(todayStart, todayEnd),
@@ -120,12 +103,15 @@ class HomeViewModel(
     }.combine(settingsDataStore.monthlyBudget) { list, budget ->
         list.apply { add(budget) }
     }.combine(_isRefreshing) { list, refreshing ->
+        list.apply { add(refreshing) }
+    }.combine(currentWeekFlow) { list, week ->
         val courses = list[0] as List<Course>
         val tasks = list[1] as List<Task>
         val expenses = list[2] as List<Expense>
         val todayExp = list[3] as Double?
         val monthExp = list[4] as Double?
         val budget = list[5] as Double
+        val refreshing = list[6] as Boolean
 
         val now = Calendar.getInstance()
         val currentMinutes = now.get(Calendar.HOUR_OF_DAY) * 60 + now.get(Calendar.MINUTE)

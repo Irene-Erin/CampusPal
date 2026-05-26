@@ -19,6 +19,9 @@ interface CourseDao {
     @Query("SELECT * FROM courses ORDER BY dayOfWeek, startTime")
     fun getAllCourses(): Flow<List<Course>>
 
+    @Query("SELECT * FROM courses ORDER BY dayOfWeek, startTime")
+    suspend fun getAllCoursesOnce(): List<Course>
+
     @Query("SELECT * FROM courses WHERE dayOfWeek = :dayOfWeek ORDER BY startTime")
     fun getCoursesByDay(dayOfWeek: Int): Flow<List<Course>>
 

@@ -170,6 +170,28 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                 )
             }
 
+            // 显示周末
+            item {
+                SettingsSwitchItem(
+                    icon = Icons.Filled.Weekend,
+                    title = "显示周末",
+                    subtitle = "课表中显示周六和周日",
+                    checked = uiState.showWeekend,
+                    onCheckedChange = { viewModel.setShowWeekend(it) },
+                )
+            }
+
+            // 显示非本周课程
+            item {
+                SettingsSwitchItem(
+                    icon = Icons.Filled.Visibility,
+                    title = "显示非本周课程",
+                    subtitle = "显示当前周次以外的课程（半透明）",
+                    checked = uiState.showNonCurrentWeek,
+                    onCheckedChange = { viewModel.setShowNonCurrentWeek(it) },
+                )
+            }
+
             // 导出数据
             item {
                 SettingsItem(
@@ -302,6 +324,42 @@ fun SettingsItem(
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
+        }
+    }
+}
+
+@Composable
+fun SettingsSwitchItem(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    title: String,
+    subtitle: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+) {
+    Card(
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                icon,
+                contentDescription = null,
+                modifier = Modifier.size(24.dp),
+                tint = MaterialTheme.colorScheme.primary,
+            )
+            Spacer(modifier = Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Medium)
+                Text(
+                    subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Switch(checked = checked, onCheckedChange = onCheckedChange)
         }
     }
 }

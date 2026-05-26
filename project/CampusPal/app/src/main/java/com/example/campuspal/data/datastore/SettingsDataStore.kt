@@ -40,6 +40,14 @@ class SettingsDataStore(private val context: Context) {
         prefs[SEMESTER_END_KEY] ?: getDefaultSemesterEnd()
     }
 
+    val showWeekend: Flow<Boolean> = context.dataStore.data.map { prefs ->
+        prefs[SHOW_WEEKEND_KEY] ?: true
+    }
+
+    val showNonCurrentWeek: Flow<Boolean> = context.dataStore.data.map { prefs ->
+        prefs[SHOW_NON_CURRENT_WEEK_KEY] ?: false
+    }
+
     suspend fun setMonthlyBudget(amount: Double) {
         context.dataStore.edit { prefs ->
             prefs[MONTHLY_BUDGET_KEY] = amount
@@ -82,6 +90,18 @@ class SettingsDataStore(private val context: Context) {
         }
     }
 
+    suspend fun setShowWeekend(show: Boolean) {
+        context.dataStore.edit { prefs ->
+            prefs[SHOW_WEEKEND_KEY] = show
+        }
+    }
+
+    suspend fun setShowNonCurrentWeek(show: Boolean) {
+        context.dataStore.edit { prefs ->
+            prefs[SHOW_NON_CURRENT_WEEK_KEY] = show
+        }
+    }
+
     // 导出所有设置和数据的 JSON
     suspend fun exportAllData(
         coursesJson: String,
@@ -111,6 +131,8 @@ class SettingsDataStore(private val context: Context) {
         private val THEME_MODE_KEY = stringPreferencesKey("theme_mode")
         private val SEMESTER_START_KEY = longPreferencesKey("semester_start")
         private val SEMESTER_END_KEY = longPreferencesKey("semester_end")
+        private val SHOW_WEEKEND_KEY = booleanPreferencesKey("show_weekend")
+        private val SHOW_NON_CURRENT_WEEK_KEY = booleanPreferencesKey("show_non_current_week")
 
         private fun getDefaultSemesterStart(): Long {
             val cal = java.util.Calendar.getInstance()

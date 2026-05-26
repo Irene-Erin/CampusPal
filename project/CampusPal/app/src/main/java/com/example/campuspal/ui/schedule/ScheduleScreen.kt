@@ -17,6 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -24,6 +25,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.campuspal.data.db.entity.Course
 import com.example.campuspal.ui.components.AppDimens
+import com.example.campuspal.ui.schedule.WeekCalculator
 import java.util.*
 
 // 时间段定义
@@ -53,6 +55,7 @@ fun ScheduleScreen(viewModel: ScheduleViewModel) {
             currentWeek = uiState.currentWeek,
             onPrev = { viewModel.prevWeek() },
             onNext = { viewModel.nextWeek() },
+            onJumpToToday = { viewModel.jumpToWeek(1) },
         )
 
         // 周视图网格 — 平板自适应
@@ -92,6 +95,7 @@ fun ScheduleScreen(viewModel: ScheduleViewModel) {
         CourseDetailDialog(
             course = uiState.selectedCourse!!,
             onDismiss = { viewModel.hideDetail() },
+            onEdit = { viewModel.editCourse(it) },
             onDelete = { viewModel.deleteCourse(it) },
         )
     }
@@ -104,10 +108,38 @@ fun ScheduleScreen(viewModel: ScheduleViewModel) {
             onSave = { viewModel.addCourse(it) },
         )
     }
+
+    // 编辑课程
+    if (uiState.editingCourse != null) {
+        CourseForm(
+            editingCourse = uiState.editingCourse,
+            onDismiss = { viewModel.hideEditDialog() },
+            onSave = { viewModel.updateCourse(it) },
+        )
+    }
+
+    // 课程冲突警告
+    if (uiState.conflictWarning != null) {
+        AlertDialog(
+            onDismissRequest = { viewModel.clearConflict() },
+            title = { Text("时间冲突") },
+            text = { Text(uiState.conflictWarning!!) },
+            confirmButton = {
+                TextButton(onClick = { viewModel.forceAddCourse() }) {
+                    Text("继续添加", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { viewModel.clearConflict() }) {
+                    Text("取消")
+                }
+            },
+        )
+    }
 }
 
 @Composable
-fun WeekSelector(currentWeek: Int, onPrev: () -> Unit, onNext: () -> Unit) {
+fun WeekSelector(currentWeek: Int, onPrev: () -> Unit, onNext: () -> Unit, onJumpToToday: () -> Unit) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
         color = MaterialTheme.colorScheme.surface,
@@ -138,11 +170,9 @@ fun WeekSelector(currentWeek: Int, onPrev: () -> Unit, onNext: () -> Unit) {
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
                 )
-                Text(
-                    text = "本学期",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                TextButton(onClick = onJumpToToday, contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)) {
+                    Text("今天", style = MaterialTheme.typography.labelSmall)
+                }
             }
             Surface(
                 shape = RoundedCornerShape(12.dp),
@@ -341,6 +371,24 @@ fun DayColumn(
                 }
             }
         }
+
+        // 当前时间指示线（仅当天显示）
+        val today = WeekCalculator.getTodayDayOfWeek()
+        if (day == today) {
+            val now = Calendar.getInstance()
+            val nowMinutes = now.get(Calendar.HOUR_OF_DAY) * 60 + now.get(Calendar.MINUTE)
+            val baseMin = 8 * 60
+            if (nowMinutes in baseMin..(21 * 60)) {
+                val offsetPx = ((nowMinutes - baseMin).toFloat() / 50f) * slotHeightPx
+                Box(
+                    modifier = Modifier
+                        .offset(y = with(LocalDensity.current) { offsetPx.toDp() })
+                        .fillMaxWidth()
+                        .height(2.dp)
+                        .background(MaterialTheme.colorScheme.error),
+                )
+            }
+        }
     }
 }
 
@@ -353,6 +401,7 @@ fun timeToMinutes(time: String): Int {
 fun CourseDetailDialog(
     course: Course,
     onDismiss: () -> Unit,
+    onEdit: (Course) -> Unit,
     onDelete: (Course) -> Unit,
 ) {
     AlertDialog(
@@ -372,13 +421,18 @@ fun CourseDetailDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = { onDelete(course) }) {
-                Text("删除", color = MaterialTheme.colorScheme.error)
+            TextButton(onClick = { onEdit(course) }) {
+                Text("编辑")
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("关闭")
+            Row {
+                TextButton(onClick = { onDelete(course) }) {
+                    Text("删除", color = MaterialTheme.colorScheme.error)
+                }
+                TextButton(onClick = onDismiss) {
+                    Text("关闭")
+                }
             }
         },
     )

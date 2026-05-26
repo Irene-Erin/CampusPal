@@ -14,6 +14,9 @@ data class ScheduleUiState(
     val selectedCourse: Course? = null,
     val showDetailDialog: Boolean = false,
     val showAddDialog: Boolean = false,
+    val editingCourse: Course? = null,
+    val conflictWarning: String? = null,
+    val pendingCourse: Course? = null,
     val isLoading: Boolean = false,
 )
 
@@ -23,6 +26,9 @@ class ScheduleViewModel(private val courseDao: CourseDao) : ViewModel() {
     private val _selectedCourse = MutableStateFlow<Course?>(null)
     private val _showDetailDialog = MutableStateFlow(false)
     private val _showAddDialog = MutableStateFlow(false)
+    private val _editingCourse = MutableStateFlow<Course?>(null)
+    private val _conflictWarning = MutableStateFlow<String?>(null)
+    private val _pendingCourse = MutableStateFlow<Course?>(null)
     private val _isLoading = MutableStateFlow(false)
 
     val uiState: StateFlow<ScheduleUiState> = combine(
@@ -30,14 +36,19 @@ class ScheduleViewModel(private val courseDao: CourseDao) : ViewModel() {
         _selectedCourse,
         _showDetailDialog,
         _showAddDialog,
+        _editingCourse,
+        _conflictWarning,
         _isLoading,
-    ) { week, course, detail, add, loading ->
+    ) { week, course, detail, add, editing, conflict, loading ->
         ScheduleUiState(
             courses = emptyList(),
             currentWeek = week,
             selectedCourse = course,
             showDetailDialog = detail,
             showAddDialog = add,
+            editingCourse = editing,
+            conflictWarning = conflict,
+            pendingCourse = _pendingCourse.value,
             isLoading = loading,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), ScheduleUiState())
@@ -86,9 +97,32 @@ class ScheduleViewModel(private val courseDao: CourseDao) : ViewModel() {
 
     fun addCourse(course: Course) {
         viewModelScope.launch {
+            val conflict = findConflictingCourse(course)
+            if (conflict != null) {
+                _conflictWarning.value = "与「${conflict.name}」（${conflict.startTime}-${conflict.endTime}）时间冲突，是否继续添加？"
+                _pendingCourse.value = course
+            } else {
+                courseDao.insert(course)
+                _showAddDialog.value = false
+            }
+        }
+    }
+
+    // 强制添加（忽略冲突）
+    fun forceAddCourse() {
+        viewModelScope.launch {
+            val course = _pendingCourse.value ?: return@launch
             courseDao.insert(course)
             _showAddDialog.value = false
+            _editingCourse.value?.let { courseDao.delete(it) }
+            _editingCourse.value = null
+            clearConflict()
         }
+    }
+
+    fun clearConflict() {
+        _conflictWarning.value = null
+        _pendingCourse.value = null
     }
 
     fun deleteCourse(course: Course) {
@@ -102,7 +136,31 @@ class ScheduleViewModel(private val courseDao: CourseDao) : ViewModel() {
     fun updateCourse(course: Course) {
         viewModelScope.launch {
             courseDao.update(course)
+            _editingCourse.value = null
         }
+    }
+
+    // 检查课程时间冲突（同一天、时间段重叠）
+    suspend fun findConflictingCourse(course: Course): Course? {
+        val allCourses = courseDao.getAllCoursesOnce()
+        return allCourses.find { existing ->
+            existing.id != course.id
+                    && existing.dayOfWeek == course.dayOfWeek
+                    && WeekCalculator.isTimeOverlap(course.startTime, course.endTime, existing.startTime, existing.endTime)
+        }
+    }
+
+    fun editCourse(course: Course) {
+        _editingCourse.value = course
+        _showDetailDialog.value = false
+    }
+
+    fun hideEditDialog() {
+        _editingCourse.value = null
+    }
+
+    fun jumpToWeek(week: Int) {
+        _currentWeek.value = week.coerceIn(1, 20)
     }
 
     class Factory(private val courseDao: CourseDao) : ViewModelProvider.Factory {
